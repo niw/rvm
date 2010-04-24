@@ -83,14 +83,19 @@ curl() {
 }
 
 openssl() {
-  if $rvm_scripts_path/match "$rvm_archflags" "x86_64" ; then
-    export openssl_os="os/compiler darwin64-x86_64-cc"
-  else
-    export openssl_os="os/compiler darwin-i386-cc"
-  fi
   package="openssl" ; version="0.9.8k" ; archive_format="tar.gz"
   package_url="http://www.openssl.org/source"
-  configure="./config --prefix=$rvm_usr_path zlib no-asm no-krb5 shared"
+
+  if [[ "Darwin" = "$(uname)" ]] ; then
+    if [[ "$(uname -m)" = "x86_64" ]] ; then
+      openssl_os="darwin64-x86_64-cc"
+    else
+      openssl_os="darwin-i386-cc"
+    fi
+    patches="$rvm_patches_path/$package/Makefile.org.patch,$rvm_patches_path/$package/crypto-Makefile.patch"
+  fi
+  configure="./Configure $openssl_os -L$rvm_usr_path/lib --prefix=$rvm_usr_path zlib no-asm no-krb5 shared"
+
   install_package
 }
 

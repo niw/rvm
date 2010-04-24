@@ -5,7 +5,8 @@ source $rvm_scripts_path/selector
 
 if [[ ! -z "$rvm_trace_flag" ]] ; then set -x ; export rvm_trace_flag ; fi
 rvm_ruby_gem_home="${rvm_ruby_gem_home:-$GEM_HOME}"
-if [[ ! -d "$rvm_ruby_gem_home" ]] && which gem &> /dev/null ; then rvm_ruby_gem_home="$(gem env home)" ; fi
+
+if [[ ! -d "$rvm_ruby_gem_home" ]] && command -v gem > /dev/null 2>&1; then rvm_ruby_gem_home="$(gem env home)" ; fi
 
 trap "if [[ -d $rvm_tmp_path/ ]] && [[ -s $rvm_tmp_path/$$ ]] ; then rm -f $rvm_tmp_path/$$ > /dev/null 2>&1 ; fi ; exit" 0 1 2 3 15
 
@@ -97,12 +98,13 @@ __rvm_gemset_copy() {
   if [[ -z "$destination_ruby" ]] ; then
     $rvm_scripts_path/log "error" "Source and destination must be specified: 'rvm gemset copy X Y'"
   fi
-  source_path="$(rvm $source_ruby > /dev/null 2>&1 ; gem env gemdir | tail -n 1)"
-  destination_path="$(rvm $destination_ruby > /dev/null 2>&1 ; gem env gemdir | tail -n 1)"
+  source_path="$(rvm $source_ruby gem env gemdir | tail -n 1)"
+  destination_path="$(rvm $destination_ruby gem env gemdir | tail -n 1)"
   if [[ -d "$source_path" ]] ; then
     if [[ ! -d "$destination_path" ]] ; then mkdir -p $destination_path ; fi
     $rvm_scripts_path/log "info" "Copying gemset from $source_ruby to $destination_ruby" ;
     for dir in bin doc gems specifications ; do
+      mkdir -p "$destination_path/$dir"
       cp -Rf "$source_path/$dir" "$destination_path/"
     done
   else
@@ -273,8 +275,10 @@ __rvm_gem_install() {
     if [[ "rvm_make_flags_flag" -eq 1 ]] ; then __rvm_make_flags ; fi
 
     if [[ ! -z "$rvm_ruby_gem_home" ]] && [[ "$rvm_ruby_gem_home" != "$rvm_gems_path" ]] ; then
-      command="GEM_HOME='$rvm_ruby_gem_home' GEM_PATH='$rvm_ruby_gem_home/bin:$rvm_gems_path/${rvm_ruby_string}${rvm_gemset_separator}global/bin' BUNDLE_PATH='${rvm_ruby_gem_home}' ${gem_prefix} gem install --ignore-dependencies $gems_args $rvm_gem_options $gem_postfix $vars"
+      #command="GEM_HOME='$rvm_ruby_gem_home' GEM_PATH='$rvm_ruby_gem_home/bin:$rvm_gems_path/${rvm_ruby_string}${rvm_gemset_separator}global/bin' BUNDLE_PATH='${rvm_ruby_gem_home}' ${gem_prefix} gem install --ignore-dependencies $gems_args $rvm_gem_options $gem_postfix $vars"
+      command="GEM_HOME='$rvm_ruby_gem_home' GEM_PATH='$rvm_ruby_gem_home/bin:$rvm_gems_path/${rvm_ruby_string}${rvm_gemset_separator}global/bin' BUNDLE_PATH='${rvm_ruby_gem_home}' ${gem_prefix} gem install $gems_args $rvm_gem_options $gem_postfix $vars"
     else
+      #--ignore-dependencies
       command="$gem_prefix gem install --ignore-dependencies $gems_args $rvm_gem_options -q $gem $gem_postfix $vars"
     fi
     __rvm_run "gem.install" "$command" "installing ${gem_name} ${gem_version}..."
@@ -306,7 +310,7 @@ __rvm_gemset_gemdir() {
 
 unset GEM_PATH
 
-if [[ -z "$(which gem 2>/dev/null)" ]] ; then
+if ! command -v gem > /dev/null ; then
   $rvm_scripts_path/log "error" "'gem' was not found, cannot perform gem actions (Do you have an RVM ruby selected?)"
   exit 1
 fi

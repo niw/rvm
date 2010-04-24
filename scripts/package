@@ -83,7 +83,7 @@ curl() {
 }
 
 openssl() {
-  package="openssl" ; version="0.9.8k" ; archive_format="tar.gz"
+  package="openssl" ; version="0.9.8n" ; archive_format="tar.gz"
   package_url="http://www.openssl.org/source"
 
   if [[ "Darwin" = "$(uname)" ]] ; then

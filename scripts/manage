@@ -141,16 +141,16 @@ __rvm_install_ruby() {
           __rvm_run "macruby/extract" "sudo /usr/sbin/installer -pkg '$rvm_archives_path/macruby_nightly.pkg' -target '/'"
           mkdir -p "$rvm_ruby_home/bin"
         else
-          macruby_path="/Library/Frameworks/MacRuby.framework/Versions/0.5/usr/bin"
+          macruby_path="/Library/Frameworks/MacRuby.framework/Versions/${rvm_ruby_version}/usr/bin"
           # TODO: Separated nightly from head.
-          $rvm_scripts_path/log "info" "Retrieving MacRuby 0.5 ..."
+          $rvm_scripts_path/log "info" "Retrieving MacRuby ${rvm_ruby_version} ..."
           $rvm_scripts_path/fetch "$rvm_url"
           result=$? ; if [[ "$result" -gt 0 ]] ; then
             $rvm_scripts_path/log "error" "There has been an error while trying to fetch the source. Aborting the installation." ; __rvm_pushpop ; return $result
           fi
           mkdir -p $rvm_ruby_src_path
-          unzip -o -j "$rvm_archives_path/$rvm_ruby_package_file" "MacRuby 0.5/MacRuby 0.5.pkg" -d "$rvm_ruby_src_path"
-          mv "$rvm_ruby_src_path/MacRuby 0.5.pkg" "$rvm_ruby_src_path/$rvm_ruby_string.pkg"
+          unzip -o -j "$rvm_archives_path/$rvm_ruby_package_file" "MacRuby ${rvm_ruby_version}/MacRuby ${rvm_ruby_version}.pkg" -d "$rvm_ruby_src_path"
+          mv "$rvm_ruby_src_path/MacRuby ${rvm_ruby_version}.pkg" "$rvm_ruby_src_path/$rvm_ruby_string.pkg"
           __rvm_run "macruby/extract" "sudo /usr/sbin/installer -pkg '$rvm_ruby_src_path/$rvm_ruby_string.pkg' -target '/'"
           mkdir -p "$rvm_ruby_home/bin"
         fi
@@ -164,7 +164,7 @@ __rvm_install_ruby() {
 export GEM_HOME="$rvm_ruby_gem_home"
 export GEM_PATH="$rvm_ruby_gem_path"
 export MY_RUBY_HOME="$rvm_ruby_home"
-export PATH="$rvm_ruby_home/bin:$rvm_ruby_gem_home/bin:$rvm_ruby_global_gems_path/bin:\$PATH"
+export PATH="$rvm_ruby_gem_home/bin:$rvm_ruby_global_gems_path/bin:$rvm_ruby_home/bin:\$PATH"
 
 exec $macruby_path/mac$binary_name $prefix "\$@"
 RubyWrapper
@@ -310,7 +310,7 @@ RubyWrapper
       #fi
 
       builtin cd "$rvm_ruby_src_path" ; chmod +x ./configure
-      rvm_ruby_configure="./configure --prefix=$rvm_ruby_home" ; message="Configuring rbx"
+      rvm_ruby_configure="./configure --prefix=$rvm_ruby_home $rvm_ruby_configure_flags" ; message="Configuring rbx"
       if [[ "$rvm_llvm_flag" = "0" ]] ; then
         rvm_ruby_configure="$rvm_ruby_configure --disable-llvm"
       else
@@ -399,12 +399,14 @@ RubyWrapper
         __rvm_inject_gem_env $rvm_ruby_home/bin/$binary
       done ; unset binary
 
+      __rvm_inject_ruby_shebang "$rvm_ruby_home/bin/rake" # #!/Users/nicksieger/Projects/ruby/jruby-15/dist/jruby-bin-1.5.0/bin/jruby -- lol!
+
       __rvm_rubygems_setup
       __rvm_irbrc
       __rvm_bin_script
       __rvm_use
 
-      for rvm_gem_name in jruby-openssl ; do
+      for rvm_gem_name in rake jruby-openssl ; do
         __rvm_run "gems" "$rvm_ruby_home/bin/gem install $rvm_gem_name $rvm_gem_options" "Installing $rvm_gem_name"
       done ; unset rvm_gem_name
     ;;
@@ -571,7 +573,7 @@ RubyWrapper
       chmod +x $rvm_ruby_home/bin/ir
       ln -fs $rvm_ruby_home/bin/ir $rvm_ruby_home/bin/ruby
 
-      __rvm_run "gems.install" "PATH=$rvm_ruby_home/bin:$PATH GEM_HOME=$rvm_ruby_gem_home GEM_PATH=$rvm_ruby_gem_home $rvm_ruby_home/bin/gem install --no-rdoc --no-ri rake $rvm_gem_options" "Installing $rvm_gem_name to $dir"
+      __rvm_run "gems.install" "PATH=$rvm_ruby_gem_home/bin:$rvm_ruby_global_gems_path/bin:$rvm_ruby_home/bin:$PATH GEM_HOME=$rvm_ruby_gem_home GEM_PATH=$rvm_ruby_gem_home $rvm_ruby_home/bin/gem install --no-rdoc --no-ri rake $rvm_gem_options" "Installing $rvm_gem_name to $dir"
 
       binaries=() # Don't wrap any longer.
       for binary_name in ${binaries[@]} ; do
@@ -586,7 +588,7 @@ export GEM_HOME="$rvm_ruby_gem_home"
 export GEM_PATH="$rvm_ruby_gem_path"
 export BUNDLE_PATH="$rvm_ruby_gem_home"
 export MY_RUBY_HOME="$rvm_ruby_home"
-export PATH="$rvm_ruby_home/bin:$rvm_ruby_gem_home/bin:$rvm_ruby_global_gems_path/bin:\$PATH"
+export PATH="$rvm_ruby_gem_home/bin:$rvm_ruby_global_gems_path/bin:$rvm_ruby_home/bin:\$PATH"
 
 exec mono $rvm_ruby_home/bin/ir.exe $binary_path "\$@"
 RubyWrapper
@@ -767,7 +769,7 @@ __rvm_fetch_ruby() {
       elif [[ -z "$rvm_ruby_version" ]] && [[ ! -z "$rvm_head_flag" ]] ; then
         rvm_url="${rvm_url:-"$rvm_ruby_repo_url/trunk"}"
       elif [[  "$rvm_major_version" = "9" ]] ; then
-        if [[ -z "$rvm_minor_version" ]] || [[ "$rvm_minor_version" = 2 ]] ; then
+        if [[ -z "$rvm_minor_version" ]] || [[ "$rvm_minor_version" = 3 ]] ; then
           rvm_url="${rvm_url:-"$rvm_ruby_repo_url/trunk"}"
         else
           rvm_url="${rvm_url:-"$rvm_ruby_repo_url/branches/ruby_1_${rvm_major_version}_${rvm_minor_version}"}"
@@ -786,6 +788,7 @@ __rvm_fetch_ruby() {
       if [[ -d "$rvm_ruby_src_path/.svn" ]] ; then
         builtin cd $rvm_ruby_src_path
         $rvm_scripts_path/log "info" "Updating ruby from $rvm_url"
+        __rvm_run "svn.switch" "svn switch $rvm_url"
         __rvm_run "svn.update" "svn update"
         if [[ ! -z "$rvm_rev" ]] ; then
           $rvm_scripts_path/log "info" "Checking out revision ${rvm_rev/-r/-r } from $rvm_url"
@@ -1006,9 +1009,9 @@ __rvm_inject_gem_env() {
   __rvm_actual_file $1
   if [[ -f "$actual_file" ]] ; then
     if [[ ! -z "$(head -n 1 $actual_file | awk '/[j]*ruby/')" ]] ; then
-      string="ENV['GEM_HOME']=ENV['GEM_HOME'] || '$rvm_ruby_gem_home'\nENV['GEM_PATH']=ENV['GEM_PATH'] || '$rvm_ruby_gem_path'\nENV['PATH']='$rvm_ruby_home/bin:$rvm_ruby_gem_home/bin:' + ENV['PATH']\nENV['BUNDLE_PATH']=ENV['BUNDLE_PATH'] || '$rvm_ruby_gem_home'\n"
+      string="ENV['GEM_HOME']=ENV['GEM_HOME'] || '$rvm_ruby_gem_home'\nENV['GEM_PATH']=ENV['GEM_PATH'] || '$rvm_ruby_gem_path'\nENV['PATH']='$rvm_ruby_gem_home/bin:$rvm_ruby_global_gems_path/bin:$rvm_ruby_home/bin:' + ENV['PATH']\nENV['BUNDLE_PATH']=ENV['BUNDLE_PATH'] || '$rvm_ruby_gem_home'\n"
     elif [[ ! -z "$(head -n 1 $actual_file | awk '/bash/')" ]] ; then
-      string="GEM_HOME=\${GEM_HOME:-'$rvm_ruby_gem_home'}\nGEM_PATH=\${GEM_PATH:-'$rvm_ruby_gem_path'}\nPATH=$rvm_ruby_home/bin:$rvm_ruby_gem_home/bin:\$PATH\nBUNDLE_PATH=\${BUNDLE_PATH:-'$rvm_ruby_gem_home'}\n"
+      string="GEM_HOME=\${GEM_HOME:-'$rvm_ruby_gem_home'}\nGEM_PATH=\${GEM_PATH:-'$rvm_ruby_gem_path'}\nPATH=$rvm_ruby_gem_home/bin:$rvm_ruby_global_gems_path/bin:$rvm_ruby_home/bin:\$PATH\nBUNDLE_PATH=\${BUNDLE_PATH:-'$rvm_ruby_gem_home'}\n"
     fi
     if [[ ! -z "$string" ]] ; then
       awk "NR==2 {print \"$string\"} {print}" "$actual_file" > "$actual_file.new"

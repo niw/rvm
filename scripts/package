@@ -108,7 +108,7 @@ openssl() {
 	configure_command="./Configure"
     patches="$rvm_patches_path/$package/Makefile.org.patch,$rvm_patches_path/$package/crypto-Makefile.patch"
   fi
-  configure="$configure_command $openssl_os -L$rvm_usr_path/lib --prefix=$rvm_usr_path zlib no-asm no-krb5 shared"
+  configure="$configure_command $openssl_os -I$rvm_usr_path/include -L$rvm_usr_path/lib --prefix=$rvm_usr_path zlib no-asm no-krb5 shared"
 
   install_package
 }

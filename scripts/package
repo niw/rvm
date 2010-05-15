@@ -97,6 +97,7 @@ curl() {
 openssl() {
   package="openssl" ; version="0.9.8n" ; archive_format="tar.gz"
   package_url="http://www.openssl.org/source"
+  configure_command="./config"
 
   if [[ "Darwin" = "$(uname)" ]] ; then
     if [[ "$(uname -m)" = "x86_64" ]] ; then
@@ -104,9 +105,10 @@ openssl() {
     else
       openssl_os="darwin-i386-cc"
     fi
+	configure_command="./Configure"
     patches="$rvm_patches_path/$package/Makefile.org.patch,$rvm_patches_path/$package/crypto-Makefile.patch"
   fi
-  configure="./Configure $openssl_os -L$rvm_usr_path/lib --prefix=$rvm_usr_path zlib no-asm no-krb5 shared"
+  configure="$configure_command $openssl_os -L$rvm_usr_path/lib --prefix=$rvm_usr_path zlib no-asm no-krb5 shared"
 
   install_package
 }

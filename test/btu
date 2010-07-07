@@ -25,7 +25,7 @@ btu_mock() {
   if [[ ! -z "$command" ]] ; then
     mkdir -p /tmp/btu/$$
     echo '!#/bin/bash' > /tmp/btu/$$/$command
-    echo -e "echo called: \$(basename \$0) \"\$@\"\nexit 0" > /tmp/btu/$$/$command
+    printf "\necho called: \$(basename \$0) \"\$@\"\nexit 0" > /tmp/btu/$$/$command
     chmod +x /tmp/btu/$$/$command
     PATH=/tmp/btu/$$:$PATH ; export PATH
   fi
@@ -37,18 +37,22 @@ btu_init() {
 }
 
 btu_summary() {
-  echo -e "\n$(scripts/color "cyan")${#__btu_runs[*]}$(scripts/color "none") commands, ${#__btu_assertions[*]} assertions, $(scripts/color "green")${#__btu_passed[*]}$(scripts/color) passed, $(scripts/color "red")${#__btu_failed[*]}$(scripts/color) failed\n"
+  printf "\n$(scripts/color "cyan")${#__btu_runs[*]}$(scripts/color "none") commands, ${#__btu_assertions[*]} assertions, $(scripts/color "green")${#__btu_passed[*]}$(scripts/color) passed, $(scripts/color "red")${#__btu_failed[*]}$(scripts/color) failed\n"
+  local failure_count=${#__btu_failed[*]}
+  [[ "$failure_count" != "0" ]] && failure_count=1
   unset __btu_runs __btu_assertions __btu_passed __btu_failed
+  return $failure_count
 }
 
-btu_run() {
+heat() {
   __btu_log "run" "$*"
   btu_push __btu_runs "$*"
   eval "$*"
+  result="$?"
 }
 
 assert() {
-  key=$1 ; first=$2 ; second=$3
+  key="$1" ; first="$2" ; second="$3"
   assertion="__btu_assert_${key} \"$first\" \"$second\""
   btu_push __btu_assertions $assertion
   eval "$assertion"
@@ -175,15 +179,16 @@ __btu_assert_no_match() {
 
 __btu_assert_file_contains() {
   regex=$(echo "$1" | sed 's/\//\\\//g')
-  if [[ ! -z "$(awk "/$regex/" "$2" | cat)" ]] ; then
+  if [[ ! -z "$(awk "/$regex/" "$2")" ]] ; then
     __btu_log "pass" "/$regex/ $(scripts/color "green")is in$(scripts/color "none") '$2'"
   else
     __btu_log "fail" "/$regex/ $(scripts/color "red")is not in$(scripts/color "none") '$2'"
   fi ; return $?
 }
+
 __btu_assert_file_does_not_contain() {
   regex=$(echo "$1" | sed 's/\//\\\//g')
-  if [[ ! -z "$(awk "/$regex/" "$2" | cat)" ]] ; then
+  if [[ -z "$(awk '/'$regex'/' "$2")" ]] ; then
     __btu_log "pass" "/$regex/ $(scripts/color "green")is not in$(scripts/color "none") '$2'"
   else
     __btu_log "fail" "/$regex/ $(scripts/color "red")is in$(scripts/color "none") '$2'"

@@ -11,7 +11,7 @@ source scripts/version
 source scripts/utility
 
 usage() {
-  echo -e "
+  printf "
   Usage:
     ${0} [options]
 
@@ -23,11 +23,18 @@ usage() {
   "
 }
 
+check_rubyopt_conditions() {
+  if [[ -n "$RUBYOPT" ]]; then
+    printf "\n\nWARNING: You have RUBYOPT set in your current environment. This may interfere with normal rvm"
+    printf "\n operation. If errors show up, please try unsetting RUBYOPT first.\n"
+  fi
+}
+
 spinner_counter=0
 spinner() {
   array=('/' '-' '\\' '|' '/' '-' '\\' '|')
   index=$((($spinner_counter % 8)))
-  echo -e -n "\r${array[$index]}"
+  printf "\r${array[$index]}"
   let "spinner_counter=spinner_counter+1"
   command -v perl > /dev/null 2>&1 && perl -e 'sleep 0.5'
 }
@@ -38,7 +45,7 @@ while [[ $# -gt 0 ]] ; do
   token="$1" ; shift
   case "$token" in
     --auto)    rvm_auto_flag=1          ;;
-    --prefix)  prefix_path="$1" ; shift ;;
+    --prefix)  rvm_prefix="$1" ; shift ;;
     --version) rvm_path="$(pwd)" ; __rvm_version ; unset rvm_path ; exit ;;
     --help|*)  usage                    ;;
   esac
@@ -79,27 +86,30 @@ source_path="${source_path:-$cwd}"
 rvm_archives_path="${rvm_archives_path:-"$rvm_path/archives"}"
 rvm_src_path="${rvm_src_path:-"$rvm_path/src"}"
 rvm_log_path="${rvm_log_path:-"$rvm_path/log"}"
-rvm_bin_path="${rvm_bin_path:-"$rvm_path/bin"}"
+
+if [[ "root" = "$(whoami)" ]] ; then
+  rvm_bin_path="${rvm_bin_path:-"/usr/local/bin"}"
+else
+  rvm_bin_path="${rvm_bin_path:-"$rvm_path/bin"}"
+fi
+
 rvm_gems_path="${rvm_gems_path:-"$rvm_path/gems"}"
 rvm_rubies_path="${rvm_rubies_path:-"$rvm_path/rubies"}"
 rvm_scripts_path="${rvm_scripts_path:-"$rvm_path/scripts"}"
 rvm_config_path="${rvm_config_path:-"$rvm_path/config"}"
 rvm_hooks_path="${rvm_hooks_path:-"$rvm_path/hooks"}"
-rvm_patches_path="${rvm_patches_path:-"$rvm_path/patches"}"
 rvm_tmp_path="${rvm_tmp_path:-"$rvm_path/tmp"}"
-rvm_symlink_path="${rvm_symlink_path:-$rvm_prefix/bin}"
 
 export rvm_gemset_separator="@" # TODO: Remove this after a while.
 
-echo -e "\n$(tput setaf 2)RVM$(tput sgr0) - shell scripts which allow management of multiple ruby interpreters and environments."
-echo -e "\n    $(tput setaf 2)RTFM: $(tput sgr0) http://rvm.beginrescueend.com/"
-echo -e "\n    $(tput setaf 2)HELP: $(tput sgr0) http://webchat.freenode.net/?channels=rvm (#rvm on irc.freenode.net)"
+printf "\n$(tput setaf 2)RVM:$(tput sgr0)   shell scripts which allow management of multiple ruby interpreters and environments."
+printf "\n$(tput setaf 2)RTFM: $(tput sgr0) http://rvm.beginrescueend.com/"
+printf "\n$(tput setaf 2)HELP: $(tput sgr0) http://webchat.freenode.net/?channels=rvm (#rvm on irc.freenode.net)"
 
-echo -e "\n********************************************************************************"
 if [[ "$upgrade_flag" -eq 1 ]] ;then
-  echo -e -n "  Upgrading the RVM installation in $rvm_path/"
+  printf "\n\n  Upgrading the RVM installation in $rvm_path/"
 else
-  echo -e -n "  Installing rvm to $rvm_path/"
+  printf "\n\n  Installing rvm to $rvm_path/"
 fi
 
 spinner
@@ -114,7 +124,7 @@ done
 #
 # Scripts
 #
-for dir_name in config scripts examples lib hooks patches help ; do
+for dir_name in config scripts examples lib hooks help patches; do
   spinner
   mkdir -p "$rvm_path/$dir_name"
   if [[ -d "$source_path/$dir_name" ]] ; then
@@ -151,23 +161,51 @@ chmod +x $rvm_bin_path/*
 #
 spinner
 if [[ ! -z "$rvm_auto_flag" ]] ; then
-  echo -e "Checking rc files... ($rvm_rc_files)"
+  printf "Checking rc files... ($rvm_rc_files)"
   if [[ "$rvm_loaded_flag" != "1" ]] ; then
     for rcfile in $(echo $rvm_rc_files) ; do
       if [[ ! -f $rcfile ]] ; then touch $rcfile ; fi
       if [[ -s "$HOME/.profile" ]] ; then
         if ! grep -q '.profile' "$rcfile" ; then
           echo "    Adding 'if [[ -s \$HOME/.profile ]] ; then source \$HOME ; fi' to $rcfile."
-          echo -e "\n# rvm-install added line:\nif [[ -s \$HOME/.profile ]] ; then source \$HOME/.profile ; fi\n" >> $rcfile
+          printf "\n# rvm-install added line:\nif [[ -s \$HOME/.profile ]] ; then source \$HOME/.profile ; fi\n" >> $rcfile
         fi
       fi
       if ! grep -q "scripts\/rvm" "$rcfile" ; then
         echo "    Adding 'if [[ -s $rvm_scripts_path/rvm ]] ; then source $rvm_scripts_path/rvm ; fi' to $rcfile."
-        echo -e "\n# rvm-install added:\nif [[ -s $rvm_scripts_path/rvm ]] ; then source $rvm_scripts_path/rvm ; fi\n" >> $rcfile
+        printf "\n# rvm-install added:\nif [[ -s $rvm_scripts_path/rvm ]] ; then source $rvm_scripts_path/rvm ; fi\n" >> $rcfile
       fi
     done
   fi
 fi
+
+#
+# Initial Interpreter Gemsets.
+#
+spinner
+mkdir -p "$rvm_gemsets_path"
+for gemset_file in $(cd gemsets ; find . -iname '*.gems' | sed 's/^\.\///') ; do
+  source_path="$(pwd)/gemsets"
+  destination="$rvm_gemsets_path/$gemset_file"
+  destination_path="$(dirname "$destination")"
+  if [[ ! -s "$destination" ]] ; then
+    mkdir -p "$destination_path"
+    cp "$source_path/$gemset_file" "$destination"
+  fi
+done ; unset destination destination_path source_path gemset_file
+
+spinner
+mkdir -p "$rvm_patchsets_path"
+for patchsets_file in $(cd gemsets ; find . -iname '*' | sed 's/^\.\///') ; do
+  source_path="$(pwd)/gemsets"
+  destination="$rvm_patchsets_path/$patchset_file"
+  destination_path="$(dirname "$destination")"
+  if [[ ! -s "$destination" ]] ; then
+    mkdir -p "$destination_path"
+    cp "$source_path/$patchset_file" "$destination"
+  fi
+done ; unset destination destination_path source_path patchset_file
+
 
 #
 # Migrate ~/.rvm/ruby-X,jruby-X,... to ~/.rvm/rubies/ for 0.1.0.
@@ -197,12 +235,12 @@ done
 # Migrate old gemset directories to new gemset pattern.
 #
 spinner
-echo -e -n "\r*" # Stop spinner.
+printf "\r*" # Stop spinner.
 
 for gemset in $rvm_path/gems/*\%* ; do
   new_path=${gemset/\%/${rvm_gemset_separator}}
   if [[ -d "$gemset" ]] && [[ ! -d "$new_path" ]] ; then
-    echo -e "    Renaming $(basename $gemset) to $(basename $new_path) for new gemset separator."
+    printf "\n    Renaming $(basename $gemset) to $(basename $new_path) for new gemset separator."
     mv $gemset $new_path
   fi
 done
@@ -210,22 +248,26 @@ done
 for gemset in $rvm_path/gems/*\+* ; do
   new_path=${gemset/\+/${rvm_gemset_separator}}
   if [[ -d "$gemset" ]] && [[ ! -d "$new_path" ]] ; then
-    echo -e "    Renaming $(basename $gemset) to $(basename $new_path) for new gemset separator."
+    printf "\n    Renaming $(basename $gemset) to $(basename $new_path) for new gemset separator."
     mv $gemset $new_path
   fi
 done
 for gemset in $rvm_path/gems/*\@ ; do
   new_path=$(echo $gemset | sed -e 's#\@$##')
   if [[ -d "$gemset" ]] && [[ ! -d "$new_path" ]] ; then
-    echo -e "    Fixing: $(basename $gemset) to $(basename $new_path) for new gemset separator."
+    printf "\n    Fixing: $(basename $gemset) to $(basename $new_path) for new gemset separator."
     mv $gemset $new_path
   fi
 done
 
-# Upgrade any default file.
-if [[ -s $rvm_config_path/default ]] && grep -q '\%' $rvm_config_path/default ; then
-  sed -e "s#\%#${rvm_gemset_separator}#g" $rvm_config_path/default > $rvm_config_path/default.new
-  mv $rvm_config_path/default.new $rvm_config_path/default
+# Move from legacy defaults to the new, alias based system.
+if [[ -s "$rvm_config_path/default" ]]; then
+  original_version="$(basename "$(grep GEM_HOME "$rvm_config_path/default" | awk -F"'" '{print $2}' | sed "s#\%#${rvm_gemset_separator}#")")"
+  if [[ -n "$original_version" ]]; then
+    $rvm_scripts_path/alias create default "$original_version" &> /dev/null
+  fi
+  unset original_version
+  rm -rf "$rvm_config_path/default"
 fi
 
 #
@@ -233,64 +275,68 @@ fi
 #
 
 if [[ "root" = "$(whoami)" ]] ; then
-  echo -e "\n    Symlinking rvm to $rvm_symlink_path/rvm ..."
-  mkdir -p $rvm_symlink_path
-  ln -nfs $rvm_bin_path/rvm $rvm_symlink_path/rvm
-  ln -nfs $rvm_bin_path/rvmsudo $rvm_symlink_path/rvmsudo
-  chmod +x $rvm_symlink_path/rvm
-  chmod +x $rvm_symlink_path/rvmsudo
+  printf "\n    Symlinking rvm to $rvm_bin_path/rvm ..."
+  mkdir -p $rvm_bin_path
+  chmod +x $rvm_bin_path/rvm
+  chmod +x $rvm_bin_path/rvmsudo
+  printf "\n    Copying manpages into place."
+  for man_file in $(\ls "$install_source_path/man"); do
+    cp -f "$install_source_path/man/$man_file" "$rvm_man_path/$man_file"
+  done
 fi
 
 if [[ "$upgrade_flag" -eq 0 ]] ; then
-  echo -e "\n********************************************************************************"
   ./scripts/notes
 fi
 
-echo -e "\n********************************************************************************"
 name="$(awk -F= '/^[[:space:]]*name/{print $2}' ~/.gitconfig 2>/dev/null)"
-echo -e "\n${name:-"$(whoami)"},\n"
-echo -e "\nThank you for using rvm. I hope that it makes your work easier and more enjoyable."
-echo -e "If you have any questions, issues and/or ideas for improvement please hop in #rvm on irc.freenode.net and let me know."
-echo -e "My irc nickname is 'wayneeseguin' and I hang out from ~09:00-17:00EST and again from ~21:00EST-~00:00EST."
-echo -e "If I do not respond right away, please hang around after asking your question, I will respond as soon as I am back."
-echo -e "Be sure to get head often as rvm development happens fast, you can do this by typing 'rvm update --head'."
-echo -e "\n  w$(tput setaf 2)⦿‿⦿$(tput sgr0)t!"
-echo -e "\n    ~ Wayne"
-echo -e "\n********************************************************************************"
+printf "\n\n${name:-"$(whoami)"},\n"
+printf "\nThank you for using rvm. I hope that it makes your work easier and more enjoyable."
+printf "\nIf you have any questions, issues and/or ideas for improvement please hop in #rvm on irc.freenode.net and let me know."
+printf "\nMy irc nickname is 'wayneeseguin' and I hang out from ~09:00-17:00EST and again from ~21:00EST-~00:00EST."
+printf "\nIf I do not respond right away, please hang around after asking your question, I will respond as soon as I am back."
+printf "\nBe sure to get head often as rvm development happens fast, you can do this by typing 'rvm update --head'."
+printf "\n  w$(tput setaf 2)⦿‿⦿$(tput sgr0)t!"
+printf "\n    ~ Wayne\n"
 
 if [[ "$upgrade_flag" -eq 1 ]] ; then
-  echo -e "\n$(tput setaf 6)**** NOTICE *************************************************************************************"
-  echo -e "*  Gemset separator has changed, it is now @ and will remain unless any rubies error using it.  *"
-  echo -e "*  If you encounter any issues with a ruby your best bet is to 'rvm remove X ; rvm install X'   *"
-  echo -e "*************************************************************************************************$(tput sgr0)\n"
-  echo -e "Upgrade of RVM in $rvm_path/ is complete.\n"
+  printf "\n$(tput setaf 6)Upgrade Notes\n"
+  printf "\n  * 'rvm notes' tells you OS dependency packages for installing rubies."
+  printf "\n  * If you encounter any issues with a ruby your best bet is to 'rvm remove X ; rvm install X' "
+  printf "\n  * 1.8.7 default patchlevel is p174, override ~/.rvm/config/db in ~/.rvm/config/user"
+  printf "\n  * Gemset separator is '@' and will remain unless any rubies error using it."
+  printf "\n$(tput sgr0)\n"
+  check_rubyopt_conditions
+  printf "\nUpgrade of RVM in $rvm_path/ is complete.\n\n"
 else
   if [[ "root" != "$(whoami)" ]] ; then
-    echo -e "\n$(tput setaf 1)You must now finish the install manually:$(tput sgr0)"
-    echo -e "\n1) Place the folowing line at the end of your shell's loading files(.bashrc or .bash_profile for bash and .zshrc for zsh), after all path/variable settings:"
-    echo -e "\n     if [[ -s $rvm_path/scripts/rvm ]] ; then source $rvm_path/scripts/rvm ; fi"
-    echo -e "\n2) Ensure that there is no 'return' from inside the .bashrc file. (otherwise rvm will be prevented from working properly)."
-    echo -e "\n   This means that if you see '[ -z "$PS1" ] && return' then you must change this line to:"
-    echo -e "\n   if [[ ! -z "$PS1" ]] ; then"
-    echo -e "\n     ... original content that was below the && return line ..."
-    echo -e "\n   fi # <= be sure to close the if."
-    echo -e "\n   #EOF .bashrc"
-    echo -e "\n   Be absolutely *sure* to REMOVE the '&& return'."
-    echo -e "\n   If you wish to DRY up your config you can 'source ~/.bashrc' at the top of your .bash_profile."
-    echo -e "\n   placing all non-interactive items in the .bashrc"
-    echo -e "\n3) Then $(tput setaf 1)CLOSE THIS SHELL$(tput sgr0) and open a new one in order to use rvm.\n"
+    printf "\n$(tput setaf 1)You must now finish the install manually:$(tput sgr0)"
+    printf "\n1) Place the folowing line at the end of your shell's loading files(.bashrc or .bash_profile for bash and .zshrc for zsh), after all path/variable settings:"
+    printf "\n     [[ -s \$HOME/.rvm/scripts/rvm ]] && source \$HOME/.rvm/scripts/rvm"
+    printf "\n   Please note that this must only occur once - so, you only need to add it the first time you install rvm."
+    printf "\n2) Ensure that there is no 'return' from inside the .bashrc file. (otherwise rvm will be prevented from working properly)."
+    printf "\n   This means that if you see '[ -z "$PS1" ] && return' then you must change this line to:"
+    printf "\n   if [[ ! -z "$PS1" ]] ; then"
+    printf "\n     ... original content that was below the && return line ..."
+    printf "\n   fi # <= be sure to close the if."
+    printf "\n   #EOF .bashrc"
+    printf "\n   Be absolutely *sure* to REMOVE the '&& return'."
+    printf "\n   If you wish to DRY up your config you can 'source ~/.bashrc' at the bottom of your .bash_profile."
+    printf "\n   placing all non-interactive items in the .bashrc, including the 'source' line above"
+    printf "\n3) Then $(tput setaf 1)CLOSE THIS SHELL$(tput sgr0) and open a new one in order to use rvm.\n"
   fi
   if [[ -s $HOME/.bashrc ]] && grep '&& return' $HOME/.bashrc ; then
-    echo -e "\n\nWARNING:  you have a 'return' statement in your .bashrc, likely this will cause untold havoc.
-       This means that if you see '[ -z "\$PS1" ] && return' then you must change this line to:
-       if [[ -n "\$PS1" ]] ; then
-         ... original content that was below the && return line ...
-       fi # <= be sure to close the if.
-       #EOF .bashrc
-
-    If you have any questions about this please visit #rvm on irc.freenode.net.\n"
+    printf "\n\nWARNING:  you have a 'return' statement in your .bashrc, likely this will cause untold havoc."
+    printf "\n   This means that if you see '[ -z "\$PS1" ] && return' then you must change this line to:"
+    printf "\n   if [[ -n "\$PS1" ]] ; then"
+    printf "\n     ... original content that was below the && return line ..."
+    printf "\n   fi # <= be sure to close the if."
+    printf "\n   #EOF .bashrc"
+    printf "\nEven if you use zsh you should still adjust the .bashrc as above."
+    printf "\nIf you have any questions about this please visit #rvm on irc.freenode.net.\n"
   fi
-  echo -e "Installation of RVM to $rvm_path/ is complete.\n\n"
+  check_rubyopt_conditions
+  printf "\nInstallation of RVM to $rvm_path/ is complete.\n\n"
 fi
 
 exit 0

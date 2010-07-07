@@ -12,9 +12,9 @@ Flags
   --trace       - Toggle trace mode on to see EVERYTHING rvm is doing.
   --force       - Force install, removes old install & source before install.
   --summary     - Used with rubydo to print out a summary of the commands run.
-  --jit         - Used with rubinius install to build with JIT
   --latest      - with gemset --dump skips version strings for latest gem.
   --gems        - with uninstall/remove removes gems with the interpreter.
+  --docs        - with install, attempt to generate ri after installation.
   --reconfigure - Force ./configure on install even if Makefile already exists.
 
 
@@ -28,10 +28,15 @@ Options
      --archives   - directory for downladed files (~/.rvm/archives/)
   -S              - Specify a script file to attempt to load and run (rubydo)
   -e              - Execute code from the command line.
-  -G|--gems       - root gem path to use
+  -G              - root gem path to use
+  --gems          - Used to set the 'gems_flag', use with 'remove' to remove gems
+  --archive       - Used to set the 'archive_flag', use with 'remove' to remove archive
   --patch         - With MRI Rubies you may specify one or more full paths to patches
                     for multiple, specify comma separated:
-                    --patch /.../.../a.patch,/.../.../.../b.patch
+                    --patch /.../.../a.patch[%prefix],/.../.../.../b.patch
+                    'prefix' is an optional argument, which will be bypassed
+                    to the '-p' argument of the 'patch' command. It is separated
+                    from patch file name with '%' symbol.
   -C|--configure  - custom configure options. If you need to pass several configure
                     options then append them comma separated: -C --...,--...,--...
   --nice          - process niceness (for slow computers, default 0)
@@ -58,6 +63,10 @@ Action
               See also: http://rvm.beginrescueend.com/rubies/installing/
   uninstall - uninstall one or many ruby versions, leaves their sources
   remove    - uninstall one or many ruby versions and remove their sources
+
+  wrapper   - generates a set of wrapper executables for a given ruby with the
+              specified ruby and gemset combination. Used under the hood for
+              passenger support and the like.
 
   ruby      - runs a named ruby file against specified and/or all rubies
   gem       - runs a gem command using selected ruby's 'gem'

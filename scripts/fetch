@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 
-if [[ ! -z "$rvm_trace_flag" ]] ; then set -x ; export rvm_trace_flag ; fi
-
-trap "if [[ -d $rvm_tmp_path/ ]] && [[ -f $rvm_tmp_path/$$ ]] ; then rm -f $rvm_tmp_path/$$ > /dev/null 2>&1 ; fi ; exit" 0 1 2 3 15
+rvm_base_except="selector"
+source "$rvm_scripts_path/base"
 
 record_md5() {
   if [[ "Darwin" = "$(uname)" ]] || [[ "FreeBSD" = "$(uname)" ]]; then
-    archive_md5="$(/sbin/md5 $archive | awk '{print $NF}')"
+    archive_md5="$(/sbin/md5 -q "${archive}")"
   else
-    archive_md5="$(md5sum $archive | awk '{print $1}')"
+    archive_md5="$(md5sum "${archive}" | awk '{print $1}')"
   fi
   $rvm_scripts_path/db "$rvm_config_path/md5" "$archive" "$archive_md5"
 }
@@ -42,7 +41,7 @@ if [[ ! -z "$rvm_debug_flag" ]] ; then $rvm_scripts_path/log "debug" "Fetching $
 archive_md5="$($rvm_scripts_path/db "$rvm_config_path/md5" "$archive")"
 if [[ -e "$archive" ]] && [[ ! -z "$archive_md5" ]] ; then
   if [[ ! -z "$rvm_debug_flag" ]] ; then $rvm_scripts_path/log "debug" "Found archive and its md5, testing correctness" ; fi
-  if [[ $($rvm_scripts_path/md5 $archive $archive_md5) -gt 0 ]] ; then
+  if ! $rvm_scripts_path/md5 "${rvm_archives_path}/${archive}" "$archive_md5" ; then
     if [[ ! -z "$rvm_debug_flag" ]] ; then $rvm_scripts_path/log "debug" "Archive is bad, downloading" ; fi
     download=1
   else

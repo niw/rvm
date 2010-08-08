@@ -4,9 +4,10 @@
 __rvm_select() {
   if [[ -z "$rvm_ruby_string" ]] ; then
     rvm_ruby_string="${rvm_ruby_interpreter}"
-    if [[ ! -z "$rvm_ruby_version" ]] ; then rvm_ruby_string="$rvm_ruby_string-$rvm_ruby_version" ; fi
-    if [[ ! -z "$rvm_ruby_patch_level" ]] ; then rvm_ruby_string="$rvm_ruby_string-$rvm_ruby_patch_level" ; fi
-    if [[ ! -z "$rvm_ruby_revision" ]] ; then rvm_ruby_string="$rvm_ruby_string-$rvm_ruby_revision" ; fi
+    if [[ -n "$rvm_ruby_version" ]] ; then rvm_ruby_string="$rvm_ruby_string-$rvm_ruby_version" ; fi
+    if [[ -n "$rvm_ruby_patch_level" ]] ; then rvm_ruby_string="$rvm_ruby_string-$rvm_ruby_patch_level" ; fi
+    if [[ -n "$rvm_ruby_revision" ]] ; then rvm_ruby_string="$rvm_ruby_string-$rvm_ruby_revision" ; fi
+    if [[ -n "$rvm_ruby_name" ]]; then rvm_ruby_name="$rvm_ruby_string-n$rvm_ruby_name"; fi
   fi
 
   __rvm_ruby_string
@@ -22,10 +23,8 @@ __rvm_select() {
           rvm_ruby_revision="head"
           __rvm_db "macruby_repo_url" "rvm_ruby_repo_url"
           rvm_url="$rvm_ruby_repo_url"
-          rvm_ruby_string="${rvm_ruby_interpreter}-head"
         elif [[ "nightly" = "$rvm_ruby_version" ]] ; then
           __rvm_db "macruby_nightly_url" "rvm_url"
-          rvm_ruby_string="${rvm_ruby_interpreter}-${rvm_ruby_version}"
           rvm_ruby_package_name="${rvm_ruby_interpreter}_nightly-${rvm_ruby_version}"
           rvm_ruby_package_file="$rvm_ruby_package_name"
         else
@@ -56,7 +55,6 @@ __rvm_select() {
         rvm_url="$rvm_url/$rvm_ruby_package_file"
       else
         unset rvm_ruby_patch_level rvm_ruby_version
-        rvm_ruby_string="$rvm_ruby_interpreter-head"
       fi
     ;;
 
@@ -64,7 +62,6 @@ __rvm_select() {
       unset rvm_ruby_patch_level
       if [[ ! -z "$rvm_head_flag" ]] ; then
         rvm_ruby_version="head"
-        rvm_ruby_string="jruby-head"
         rvm_ruby_repo_url="${rvm_ruby_repo_url:-$(__rvm_db "jruby_repo_url")}"
         rvm_url="${rvm_ruby_repo_url:-$(__rvm_db "jruby_repo_url")}"
       else
@@ -73,7 +70,6 @@ __rvm_select() {
         jruby_url="$(__rvm_db "jruby_url")"
         rvm_ruby_package_file="${rvm_ruby_interpreter}-bin-${rvm_ruby_version}"
         rvm_ruby_package_name="${rvm_ruby_interpreter}-${rvm_ruby_version}"
-        rvm_ruby_string="${rvm_ruby_interpreter}-${rvm_ruby_version}"
         rvm_url="${jruby_url}/${rvm_ruby_version}/${rvm_ruby_package_file}.tar.gz"
         unset jruby_url
       fi
@@ -86,7 +82,6 @@ __rvm_select() {
       maglev_url="$(__rvm_db "maglev_url")"
       if [[ ! -z "$rvm_head_flag" ]] ; then
         rvm_ruby_version="head"
-        rvm_ruby_string="maglev-head"
         rvm_ruby_repo_url="${rvm_ruby_repo_url:-$(__rvm_db "maglev_repo_url")}"
         rvm_url="${rvm_ruby_repo_url:-$(__rvm_db "maglev_repo_url")}"
       else
@@ -96,7 +91,6 @@ __rvm_select() {
         rvm_gemstone_package_file="GemStone-${rvm_ruby_version}.${system}-${arch}"
         rvm_ruby_version="${rvm_ruby_version:-"$(__rvm_db "maglev_version")"}"
         rvm_ruby_package_name="${rvm_ruby_interpreter}-${rvm_ruby_version}"
-        rvm_ruby_string="${rvm_ruby_interpreter}-${rvm_ruby_version}"
         rvm_url="${rvm_ruby_url:-"$maglev_url/${rvm_ruby_package_file}.${rvm_archive_extension}"}"
         rvm_gemstone_url="${rvm_gemstone_url:-"$maglev_url/${rvm_gemstone_package_file}.${rvm_archive_extension}"}"
         export MAGLEV_HOME="$rvm_rubies_path/$rvm_ruby_string"
@@ -107,14 +101,12 @@ __rvm_select() {
       unset rvm_ruby_patch_level
       if [[ "$rvm_head_flag" -eq 1 ]] ; then
         rvm_ruby_version="head"
-        rvm_ruby_string="${rvm_ruby_interpreter}-${rvm_ruby_version}"
         rvm_ruby_package_name="${rvm_ruby_string}"
         rvm_ruby_repo_url="${rvm_ruby_repo_url:-$(__rvm_db "ironruby_repo_url")}"
         rvm_url="${rvm_ruby_repo_url:-$(__rvm_db "ironruby_repo_url")}"
       else
         rvm_archive_extension="zip"
         rvm_ruby_version=${rvm_ruby_version:-"$(__rvm_db "ironruby_version")"}
-        rvm_ruby_string="${rvm_ruby_interpreter}-${rvm_ruby_version}"
         rvm_ruby_package_name="${rvm_ruby_interpreter}-${rvm_ruby_version}"
         rvm_ruby_package_file="${rvm_ruby_interpreter}-${rvm_ruby_version}.${rvm_archive_extension}"
         rvm_url="$(__rvm_db "ironruby_${rvm_ruby_version}_url")${rvm_ruby_package_file}"
@@ -127,9 +119,6 @@ __rvm_select() {
       rvm_ruby_version=${rvm_ruby_version:-"$(__rvm_db "ree_version")"}
       if [[ ! -z "$rvm_ruby_patch_level" ]] ; then
         rvm_ruby_patch_level="$(echo $rvm_ruby_patch_level | sed 's#^p##')"
-        rvm_ruby_string="${rvm_ruby_interpreter}-${rvm_ruby_version}-${rvm_ruby_patch_level}"
-      elif [[ "$rvm_head_flag" = 1 ]] ; then
-        rvm_ruby_string="${rvm_ruby_interpreter}-${rvm_ruby_version}-head"
       fi
 
       if [[ "$rvm_ruby_version" != "head" ]]  ; then
@@ -150,7 +139,7 @@ __rvm_select() {
     mput|shyouhei)
       rvm_ruby_interpreter="mput"
       rvm_ruby_version="head"
-      rvm_ruby_string="mput-head"
+      rvm_ruby_string=$(echo $rvm_ruby_string | sed -e 's/shyouhei/mput/g')
       unset rvm_ruby_patch_level
       rvm_ruby_repo_url=${rvm_mput_repo_url:-"$(__rvm_db "shyouhei_repo_url")"}
       rvm_url=$rvm_ruby_repo_url
@@ -199,7 +188,7 @@ __rvm_select() {
       rvm_minor_version=$(echo $rvm_ruby_version | awk -F'.' '{ print $3 }')
     fi
 
-    rvm_ruby_package_name="${rvm_ruby_package_name:-$rvm_ruby_string}"
+    rvm_ruby_package_name="${rvm_ruby_package_name:-$(echo $rvm_ruby_string | sed -e 's/-n.*$//')}"
     rvm_ruby_home="$rvm_rubies_path/$rvm_ruby_string"
     rvm_ruby_log_path="$rvm_log_path/$rvm_ruby_string"
     rvm_ruby_repo_path="$rvm_repo_path/$rvm_ruby_string"
@@ -221,13 +210,12 @@ __rvm_select() {
 
     rvm_ruby_selected_flag=1
 
-    mkdir -p $rvm_ruby_log_path
+    mkdir -p "$rvm_ruby_log_path"
 
     export rvm_ruby_interpreter rvm_ruby_version rvm_ruby_repo_url rvm_ruby_package_name rvm_url rvm_ruby_patch_level rvm_ruby_configure rvm_ruby_configure_flags rvm_ruby_make rvm_ruby_make_install rvm_ruby_revision rvm_ruby_tag rvm_release_version rvm_major_version rvm_minor_version rvm_gemset_name rvm_gems_path rvm_ruby_gem_home rvm_path rvm_src_path rvm_bin_path rvm_ruby_binary rvm_ruby_home rvm_log_path rvm_ruby_log_path rvm_src_path rvm_ruby_src_path rvm_ruby_irbrc rvm_ruby_selected_flag rvm_ruby_string
   else
     rvm_ruby_interpreter="${rvm_ruby_interpreter:-system}"
   fi
-
 }
 
 __rvm_use() {
@@ -237,21 +225,23 @@ __rvm_use() {
   if [[ "system" = "$rvm_ruby_interpreter" ]] ; then
 
     unset GEM_HOME GEM_PATH BUNDLE_PATH MY_RUBY_HOME RUBY_VERSION IRBRC
-    new_path="$(echo $PATH | tr ':' '\n' | awk '$0 !~ /rvm/' | paste -sd : -)"
+    new_path="$(echo $PATH | \tr ':' '\n' | awk '$0 !~ /rvm/' | paste -sd : -)"
     new_path="$rvm_bin_path:$new_path"
     if [[ -s $rvm_config_path/system ]] ; then
       grep "MY_RUBY_HOME='$rvm_rubies_path" "$rvm_config_path/system" > /dev/null
       if [[ $? -eq 0 ]] ; then
-        rm -f $rvm_config_path/system # 'system' should *not* point to an rvm ruby.
+        [[ -f "$rvm_config_path/system" ]] && rm -f $rvm_config_path/system # 'system' should *not* point to an rvm ruby.
       else
-        source $rvm_config_path/system
+        source "$rvm_config_path/system"
       fi
     fi
 
-    if [[ "root" = "$(whoami)" ]] ; then
+    # Check binaries, remove under the condition they're symlinks.
+    if [[ "$rvm_sandboxed" = "0" ]] ; then
       for binary in ruby gem irb ri rdoc rake erb testrb ; do
-        rm -f "$rvm_bin_path/$binary"
-      done
+        full_binary_path="$rvm_bin_path/$binary"
+        [[ -L "$full_binary_path" ]] && rm -f "$full_binary_path"
+      done; unset binary full_binary_path
     fi
 
     if [[ ! -z "$rvm_verbose_flag" ]] ; then
@@ -286,10 +276,10 @@ __rvm_use() {
     __rvm_ensure_has_enviroment_files
 
     if [[ ! -z "$rvm_verbose_flag" ]] ; then
-      $rvm_scripts_path/log "info" "Using $(basename $GEM_HOME | tr '-' ' ' | sed 's/'${rvm_gemset_separator}'/ with gemset /')"
+      $rvm_scripts_path/log "info" "Using $(basename $GEM_HOME | \tr '-' ' ' | sed 's/'${rvm_gemset_separator}'/ with gemset /')"
     fi
 
-    new_path="$(echo $PATH | tr ':' '\n' | awk '$0 !~ /rvm/' | paste -sd : -)"
+    new_path="$(echo $PATH | \tr ':' '\n' | awk '$0 !~ /rvm/' | paste -sd : -)"
     new_path="$GEM_HOME/bin:$rvm_ruby_global_gems_path/bin:$MY_RUBY_HOME/bin:$rvm_bin_path:$new_path"
   fi
 
@@ -302,16 +292,16 @@ __rvm_use() {
   environment_id="$(__rvm_environment_identifier)"
 
   if [[ ! -z "$rvm_default_flag" ]] && [[ "default" != "$rvm_ruby_interpreter" ]] ; then
-    if [[ "root" = "$(whoami)" ]] ; then
+    if [[ "$rvm_sandboxed" = "0" ]] ; then
       # Sets up the default wrappers.
       $rvm_scripts_path/wrapper "$rvm_ruby_string"
     fi
     if [[ "system" = "$rvm_ruby_interpreter" ]] ; then
       $rvm_scripts_path/alias delete default &> /dev/null
-      rm -f $rvm_config_path/default
       rm -f $rvm_bin_path/default*
-      rm -f $rvm_environments_path/default
-      rm -f $rvm_wrappers_path/default
+      [[ -f $rvm_config_path/default ]] && rm -f $rvm_config_path/default
+      [[ -f $rvm_environments_path/default ]] && rm -f $rvm_environments_path/default
+      [[ -f $rvm_wrappers_path/default ]] && rm -f $rvm_wrappers_path/default
     else
       RUBY_VERSION="$($rvm_ruby_home/bin/ruby -v | sed 's#^\(.*\) (.*$#\1#')"
       export GEM_HOME GEM_PATH BUNDLE_PATH MY_RUBY_HOME RUBY_VERSION
@@ -362,13 +352,17 @@ __rvm_ruby_string() {
     fi
   fi
 
+  # Preparation for alias tags
+  rvm_ruby_alias=$(echo "$rvm_ruby_string" | awk -F+ '{print $2}')
+  rvm_ruby_string=$(echo "$rvm_ruby_string" | awk -F+ '{print $1}')
+
   set_name=$(echo "$rvm_ruby_string" | awk -F${rvm_gemset_separator} '{print $2}')
   if [[ ! -z "$set_name" ]] ; then rvm_gemset_name="$set_name" ; fi
   ruby_string=$(echo "$rvm_ruby_string" | awk -F${rvm_gemset_separator} '{print $1}')
 
   __rvm_unset_ruby_variables
 
-  for string in $(echo $ruby_string | tr '-' ' ') ; do
+  for string in $(echo $ruby_string | \tr '-' ' ') ; do
     if [[ "head" = "$string" ]] ; then
       rvm_ruby_revision="head"
       unset rvm_ruby_patch_level rvm_ruby_revision rvm_ruby_tag
@@ -390,7 +384,7 @@ __rvm_ruby_string() {
       unset rvm_ruby_revision rvm_ruby_tag
     elif $rvm_scripts_path/match "$string" "^p[0-9]" ; then
       rvm_ruby_patch_level="$string"
-    elif $rvm_scripts_path/match "$string" "^[0-9][0-9]" ; then
+    elif [[ -n "$rvm_ruby_version" ]] && $rvm_scripts_path/match "$string" "^[0-9][0-9]" ; then
       if [[ "ree" = "$rvm_ruby_interpreter" ]] ; then
         rvm_ruby_patch_level="$string"
         unset rvm_ruby_revision
@@ -418,6 +412,8 @@ __rvm_ruby_string() {
       rvm_ruby_user_tag="$string"
     elif $rvm_scripts_path/match "$string" "^b[0-9][0-9]" ; then
       rvm_ruby_bits="$string"
+    elif $rvm_scripts_path/match "$string" "^n" ; then
+      rvm_ruby_name="${string/n/}"
     elif $rvm_scripts_path/match "ruby rbx jruby macruby ree rubinius maglev mput shyouhei ironruby " "$string " ; then
       # NOTE: The space at the end of each of the above strings is *very* important.
       rvm_ruby_interpreter="$string"
@@ -480,5 +476,136 @@ __rvm_ruby_string() {
       fi
     fi
   fi
+
+  if [[ -n "${rvm_ruby_name}" ]] ; then
+    rvm_ruby_string="${rvm_ruby_string}-n${rvm_ruby_name}"
+  fi
+}
+
+# Select a gemset based on CLI set options and environment.
+# This only sets 'rvm_ruby_gem_home'
+__rvm_gemset_select() {
+  command -v gem > /dev/null
+  if [[ $? -gt 0 ]] ; then return 0 ; fi # Stop if no 'gem' command is available.
+
+  rvm_ruby_global_gems_path="$rvm_gems_path/${rvm_ruby_string}${rvm_gemset_separator}global"
+
+  #if [[ -z "$(echo $rvm_ruby_gem_home | grep "$rvm_path")" ]] ; then
+  #  $rvm_scripts_path/log "warn" "Gemsets cannot be used with system ruby installs (yet)."
+  #fi
+
+  if [[ -z "$rvm_gemset_name" ]] ; then
+    # No longer defaulting to 'sticky' gem sets.
+    # Set 'rvm_sticky_flag=1' in ~/.rvmrc to enable.
+    if [[ -n "$rvm_sticky_flag" ]] ; then
+      if [[ -n "$GEM_HOME" ]] ; then
+        rvm_gemset_name=$(echo $GEM_HOME | xargs basename | awk -F${rvm_gemset_separator} '{print $2}')
+      fi
+      if [[ -n "$rvm_ruby_gem_home" ]] ; then
+        rvm_gemset_name=$(echo $rvm_ruby_gem_home | xargs basename | awk -F${rvm_gemset_separator} '{print $2}')
+      fi
+    fi
+
+    if [[ -n "$rvm_gemset_name" ]] && ! $rvm_scripts_path/match "$rvm_gemset_name" "^[0-9]\.[0-9]" ; then
+      rvm_ruby_gem_home="$rvm_gems_path/${rvm_ruby_string}${rvm_gemset_separator}${rvm_gemset_name}"
+    else
+      if [[ -n "$rvm_ruby_string" ]] && [[ "$rvm_ruby_interpreter" != "system" ]] ; then
+        rvm_ruby_gem_home="$rvm_gems_path/$rvm_ruby_string"
+      elif [[ -z "$GEM_HOME" ]]  && [[ -n "$(command -v gem)" ]] ; then
+        rvm_ruby_gem_home=$(gem env gemdir)
+      elif [[ -n "$GEM_HOME" ]] ; then
+        rvm_ruby_gem_home="$GEM_HOME"
+      else
+        unset rvm_ruby_gem_home
+      fi
+    fi
+    if [[ -z "$rvm_gemset_name" ]] ; then unset rvm_gemset_name ; fi
+  else
+    gemset=$(echo "$rvm_ruby_gem_home" | awk -F'@' '{print $NF}')
+    if [[ -z "$rvm_ruby_string" ]] && [[ -n "${GEM_HOME/@*/}" ]] ; then
+      rvm_ruby_string=$(basename ${GEM_HOME/@*/})
+    fi
+
+    if [[ -n "$rvm_ruby_string" ]] ; then
+      if [[ -z "$rvm_ruby_gem_home" ]] || [[ -n "$gemset" ]] ; then
+        rvm_ruby_gem_home="$rvm_gems_path/${rvm_ruby_string}${rvm_gemset_separator}${rvm_gemset_name}"
+      elif [[ -n "$gemset" ]] && [[ "$rvm_gemset_name" != "$gemset" ]] ; then
+        rvm_ruby_gem_home="$rvm_gems_path/${rvm_ruby_string}${rvm_gemset_separator}${rvm_gemset_name}"
+      fi ; unset gemset
+    else
+      $rvm_scripts_path/log "error" "Gemsets can not be used with non rvm controlled rubies (currently)."
+      return 1
+    fi
+  fi
+
+  # If the gemset does not exist, then notify the user as such and abort the action.
+  if [[ -n "$rvm_gemset_name" ]] && [[ ! -d "$rvm_ruby_gem_home" ]] ; then
+    if [[ "$rvm_gemset_create_on_use_flag" -ne 1 ]] && [[ "$rvm_create_flag" -ne 1 ]] && [[ "$rvm_delete_flag" -ne 1 ]] ; then
+      $rvm_scripts_path/log "error" "Gemset '$rvm_gemset_name' does not exist, rvm gemset create '$rvm_gemset_name' first."
+      return 1
+    fi
+  elif [[ "$rvm_delete_flag" -eq 1 ]] ; then
+    return 1
+  fi
+
+  if [[ -z "$rvm_ruby_gem_home" ]] && [[ -n $rvm_ruby_string ]] ; then
+    rvm_ruby_gem_home="$rvm_gems_path/$rvm_ruby_string"
+    rvm_ruby_global_gems_path="$rvm_gems_path/$rvm_ruby_string${rvm_gemset_separator}global"
+  fi
+
+  rvm_ruby_gem_path="$rvm_ruby_gem_home:$rvm_ruby_global_gems_path"
+
+  # Ensure that the ruby gem home exists.
+  mkdir -p "$rvm_ruby_gem_home"
+  if [[ -n "$rvm_ruby_gem_home" ]] && echo "$rvm_ruby_gem_home" | grep -q 'rvm'; then
+    if __rvm_using_gemset_globalcache && [[ ! -L "$rvm_ruby_gem_home/cache" ]]; then
+      mv "$rvm_ruby_gem_home/cache/"*.gem "$rvm_gems_cache_path/" 2>/dev/null
+      rm -rf "$rvm_ruby_gem_home/cache"
+      ln -nfs "$rvm_gems_cache_path" "$rvm_ruby_gem_home/cache"
+    fi
+  fi
+
+  export rvm_ruby_gem_path rvm_ruby_gem_home
+}
+
+# Use a gemset specified by 'rvm_ruby_gem_home'
+__rvm_gemset_use() {
+  #if [[ -z "$(echo $rvm_ruby_gem_home | grep "rvm")" ]] ; then
+  #  $rvm_scripts_path/log "warn" "Gemsets cannot be used with system ruby installs (yet)."
+  #fi
+  if [[ -n "$rvm_ruby_gem_home" ]] ; then
+    if [[ ! -d "$rvm_ruby_gem_home" ]] ; then
+      if [[ "$rvm_gemset_create_on_use_flag" -eq 1 ]] || [[ "$rvm_create_flag" -eq 1 ]]; then
+        $rvm_scripts_path/gemsets create $rvm_gemset_name
+      else
+        $rvm_scripts_path/log "error" "Gemset '$rvm_gemset_name' does not exist, rvm gemset create '$rvm_gemset_name' first."
+        return 1
+      fi
+    fi
+
+    if [[ "$rvm_interactive" -eq 1 ]] || [[ "$rvm_verbose_flag" -eq 1 ]] ; then
+      $rvm_scripts_path/log "info" "Now using gemset '${rvm_gemset_name:-default}'"
+    fi
+
+    rvm_ruby_gem_home="$(echo $GEM_HOME | sed 's/'${rvm_gemset_separator}'.*$//')${rvm_gemset_separator}${rvm_gemset_name}"
+    GEM_HOME="$rvm_ruby_gem_home"
+    BUNDLE_PATH="$rvm_ruby_gem_home"
+    GEM_PATH="$rvm_ruby_gem_home/bin:$(echo $GEM_HOME | sed 's/'${rvm_gemset_separator}'.*$//')${rvm_gemset_separator}global/bin"
+    export rvm_ruby_gem_home GEM_HOME BUNDLE_PATH GEM_PATH
+
+    __rvm_use # Now ensure the selection takes effect for the environment.
+  fi
+  return 0
+}
+
+__rvm_gemset_clear() {
+  unset rvm_gemset_name ; shift
+  rvm_ruby_gem_home="$(echo $GEM_HOME | sed "s#${rvm_gemset_separator:-'@'}.*\$##g")"
+  rvm_ruby_global_gems_path="$(echo $GEM_HOME | sed 's/'${rvm_gemset_separator}'.*$//')${rvm_gemset_separator}global"
+  GEM_HOME=$rvm_ruby_gem_home
+  BUNDLE_PATH="$rvm_ruby_gem_home"
+  GEM_PATH="$rvm_ruby_gem_home/bin:$rvm_ruby_global_gems_path/bin"
+  export rvm_ruby_gem_home rvm_ruby_global_gems_path GEM_HOME BUNDLE_PATH GEM_PATH
+  __rvm_use # Now ensure the selection takes effect for the environment.
 }
 

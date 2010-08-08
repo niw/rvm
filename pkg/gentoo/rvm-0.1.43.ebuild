@@ -10,7 +10,7 @@ DESCRIPTION="RVM facilitates easy installation and management of multiple Ruby e
 HOMEPAGE="http://rvm.beginrescueend.com/"
 
 # This should be the first 7 characters of the tagged version's commit.
-VERSION_SHORT_SHA1="d3b8fc9"
+VERSION_SHORT_SHA1="795c4c40be0b7121a7a9d2fe2ce313329dbec994"
 
 SRC_URI="http://github.com/wayneeseguin/rvm/tarball/${PV} -> ${P}.tar.gz"
 LICENSE="MIT"
@@ -35,27 +35,28 @@ src_install() {
 	done
 	export rvm_prefix="${D}"
 	export rvm_path="${D}${RVM_DIR}"
-	export rvm_sandboxed=1
+	export rvm_symlink_path="${D}/usr/bin"
 	./install || die "Installation failed."
 
-	echo "rvm_sandboxed=1" > "${T}"/rvmrc
-	echo "rvm_prefix=\"$(dirname $RVM_DIR)\""
-	echo "rvm_path=\"${RVM_DIR}\"" >> "${T}"/rvmrc
+	echo "rvm_path=${RVM_DIR}" > "${T}"/rvmrc
 	insinto /etc
 	doins "${T}"/rvmrc || die "Failed to install /etc/rvmrc."
 	elog "A default /etc/rvmrc has been installed.  Feel free to modify it."
 	elog
 
-	touch "${T}"/system
-	insinto ${RVM_DIR}/environments
-	doins "${T}"/system || die "Failed to install ${RVM_DIR}/environments/system."
-	elog "You may also wish to review ${RVM_DIR}/environments/system ."
+	echo 'unset RUBY_VERSION' > "${T}"/system
+	echo 'unset GEM_HOME' >> "${T}"/system
+	echo 'unset GEM_PATH' >> "${T}"/system
+	echo 'unset MY_RUBY_HOME' >> "${T}"/system
+	insinto ${RVM_DIR}/config
+	doins "${T}"/system || die "Failed to install ${RVM_DIR}/config/system."
+	elog "You may also wish to review ${RVM_DIR}/config/system ."
 	elog
 
 	elog "Before any user (including root) can use rvm, the following line must be appended"
 	elog "to the end of the user's shell's loading files (.bashrc and then .bash_profile"
 	elog "for bash; or .zshrc for zsh), after all path/variable settings:"
 	elog
-	elog "     [[ -s $RVM_DIR/scripts/rvm ]] && source $RVM_DIR/scripts/rvm"
+	elog "     if [[ -s $RVM_DIR/scripts/rvm ]] ; then source $RVM_DIR/scripts/rvm ; fi"
 
 }

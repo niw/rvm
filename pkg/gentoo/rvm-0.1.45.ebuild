@@ -2,11 +2,15 @@
 # Distributed under the terms of the GNU General Public License v2
 # $Header: $
 
-EGIT_REPO_URI="git://github.com/wayneeseguin/rvm.git"
+EAPI=2
 
-inherit git
+inherit eutils
 
-SRC_URI=""
+# This should be the first 7 characters of the tagged version's commit.
+VERSION_SHORT_SHA1="661c75f39c9f40c6347cdfe93f761ef9bfba3de4"
+
+SRC_URI="http://github.com/wayneeseguin/rvm/tarball/${PV} -> ${P}.tar.gz"
+S="${WORKDIR}/wayneeseguin-rvm-${VERSION_SHORT_SHA1}"
 
 DESCRIPTION="RVM facilitates easy installation and management of multiple Ruby environments and sets of gems"
 HOMEPAGE="http://rvm.beginrescueend.com/"

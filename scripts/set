@@ -12,11 +12,12 @@ args="$*"
 
 __rvm_attempt_single_exec() {
   # Return if we have multiple rubies. or we're not running exec.
-  if [[ "$action" != "exec" ]] || $rvm_scripts_path/match "$rvm_ruby_strings" ' '; then
-    return 1
+  local ruby_string_lines="$(printf "$rvm_ruby_strings" | wc -l | __rvm_strip)"
+  if [[ "$action" = "exec" && -n "$rvm_ruby_strings" && "$ruby_string_lines" = "0" ]]; then
+    __rvm_become "$rvm_ruby_strings"
+    eval "exec $args"
   fi
-  __rvm_become "$rvm_ruby_strings"
-  eval "exec $args"
+  return 1
 }
 
 # Perform an action using one of a selected ruby's specified binaries.
@@ -63,8 +64,8 @@ __rvm_ruby_do() {
   fi
 
   if [[ ! -z "$rvm_json_flag" ]] || [[ ! -z "$rvm_yaml_flag" ]] || [[ ! -z "$rvm_summary_flag" ]] ; then
-    mkdir -p ./log/$rvm_ruby_string/
-    touch ./log/$rvm_ruby_string/$action.log ./log/$rvm_ruby_string/$action.error.log
+    \mkdir -p ./log/$rvm_ruby_string/
+    \touch ./log/$rvm_ruby_string/$action.log ./log/$rvm_ruby_string/$action.error.log
     eval "$rvm_command" >> ./log/$rvm_ruby_string/$action.log 2>> ./log/$rvm_ruby_string/$action.error.log
   else
     if [[ "$rvm_verbose_flag" != "0" ]] ; then
@@ -123,7 +124,7 @@ __rvm_yaml() {
     fi
     yaml="$yaml\n  \"${rubies[$index]}\": ${statuses[$index]}"
   done ; unset index array_start
-  mkdir -p log
+  \mkdir -p log
   printf "$yaml" | tee -a log/summary.yaml
 
   return ${#errors[*]}
@@ -148,7 +149,7 @@ __rvm_json() {
   done ; unset index array_start
   json="$json\n  }\n}"
 
-  mkdir -p log
+  \mkdir -p log
   printf "$json" | tee -a log/summary.json
 
   return ${#errors[*]}
@@ -159,8 +160,7 @@ __rvm_json() {
 
 rubies=() ; successes=() ; errors=() ; statuses=()
 
-rvm_ruby_strings="${rvm_ruby_strings:-"$($rvm_scripts_path/list strings)"}"
-rvm_ruby_strings="$(echo "$rvm_ruby_strings" | \tr ',' ' ')"
+rvm_ruby_strings="$(__rvm_expand_ruby_string "$rvm_ruby_strings")"
 
 # Check for a single ruby && exec if present.
 __rvm_attempt_single_exec

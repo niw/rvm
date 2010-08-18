@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-if [[ -z "$rvm_sandboxed" ]]; then
+if [[ -z "$rvm_selfcontained" ]]; then
   if [[ "root" = "$(whoami)" ]] || [[ -n "$rvm_prefix" && "$rvm_prefix" != "$HOME"/* ]]; then
-    export rvm_sandboxed=0
+    export rvm_selfcontained=0
   else
-    export rvm_sandboxed=1
+    export rvm_selfcontained=1
   fi
 fi
 
@@ -61,7 +61,7 @@ done
 
 if [[ -z "$rvm_prefix" ]] ; then
   __rvm_load_rvmrc
-  if [[ "$rvm_sandboxed" = "0" ]] ; then
+  if [[ "$rvm_selfcontained" = "0" ]] ; then
     rvm_prefix="${rvm_prefix:-"/usr/local/"}"
   else
     rvm_prefix="${rvm_prefix:-"$HOME/."}"
@@ -95,10 +95,14 @@ rvm_archives_path="${rvm_archives_path:-"$rvm_path/archives"}"
 rvm_src_path="${rvm_src_path:-"$rvm_path/src"}"
 rvm_log_path="${rvm_log_path:-"$rvm_path/log"}"
 
-if [[ -z "$rvm_prefix" ]] && [[ "root" = "$(whoami)" ]] ; then
-  rvm_bin_path="${rvm_bin_path:-"/usr/local/bin"}"
+if [[ "$rvm_selfcontained" = "0" ]] ; then
+  rvm_bin_path="${rvm_bin_path:-"${rvm_prefix}bin"}"
+  rvm_man_path="${rvm_man_path:-"${rvm_prefix}share/man"}"
+  rvm_rc_files="${rvm_rc_files:-"/etc/profile /etc/zshenv"}"
 else
+  rvm_man_path="${rvm_man_path:-"$rvm_path/man"}"
   rvm_bin_path="${rvm_bin_path:-"$rvm_path/bin"}"
+  rvm_rc_files="${rvm_rc_files:-"$HOME/.bash_profile $HOME/.bashrc $HOME/.zshenv"}"
 fi
 
 rvm_gems_path="${rvm_gems_path:-"$rvm_path/gems"}"
@@ -122,11 +126,11 @@ fi
 
 spinner
 
-mkdir -p "$rvm_archives_path" "$rvm_src_path" "$rvm_log_path" "$rvm_bin_path" "$rvm_gems_path" "$rvm_rubies_path" "$rvm_config_path" "$rvm_hooks_path" "$rvm_tmp_path"
+\mkdir -p "$rvm_archives_path" "$rvm_src_path" "$rvm_log_path" "$rvm_bin_path" "$rvm_gems_path" "$rvm_rubies_path" "$rvm_config_path" "$rvm_hooks_path" "$rvm_tmp_path"
 
 for file in README LICENCE ; do
   spinner
-  cp -f "$source_path/$file" "$rvm_path/"
+  \cp -f "$source_path/$file" "$rvm_path/"
 done
 
 #
@@ -134,22 +138,22 @@ done
 #
 for dir_name in config scripts examples lib hooks help patches; do
   spinner
-  mkdir -p "$rvm_path/$dir_name"
+  \mkdir -p "$rvm_path/$dir_name"
   if [[ -d "$source_path/$dir_name" ]] ; then
-    cp -Rf "$source_path/$dir_name" "$rvm_path"
+    \cp -Rf "$source_path/$dir_name" "$rvm_path"
   fi
 done ; unset dir_name
 
 spinner
 if [[ ! -s "$rvm_config_path/user" ]] ; then
-  mkdir -p "$rvm_config_path/"
+  \mkdir -p "$rvm_config_path/"
   echo '# Users settings file, overrides db file settings and persists across installs.' >> $rvm_config_path/user
 fi
 
 scripts=("monitor" "match" "log" "install" "color" "db" "fetch" "log" "set" "package")
 for script_name in "${scripts[@]}" ; do
   spinner
-  chmod +x $rvm_scripts_path/$script_name
+  chmod +x "$rvm_scripts_path/$script_name" 2>/dev/null # Hide errors.
 done
 
 #
@@ -158,8 +162,8 @@ done
 # Cleanse and purge...
 for file in rvm-prompt rvm rvmsudo rvm-shell rvm-auto-ruby ; do
   spinner && perl -e 'sleep 0.2'
-  rm -f "$rvm_bin_path/$file"
-  cp -f "$source_path/binscripts/$file" $rvm_bin_path/
+  \rm -f "$rvm_bin_path/$file"
+  \cp -f "$source_path/binscripts/$file" $rvm_bin_path/
 done
 spinner
 chmod +x $rvm_bin_path/*
@@ -172,7 +176,7 @@ if [[ -n "$rvm_auto_flag" ]] ; then
   printf "Checking rc files... ($rvm_rc_files)"
   if [[ "$rvm_loaded_flag" != "1" ]] ; then
     for rcfile in $(echo $rvm_rc_files) ; do
-      if [[ ! -f $rcfile ]] ; then touch $rcfile ; fi
+      if [[ ! -f $rcfile ]] ; then \touch $rcfile ; fi
       if [[ -s "$HOME/.profile" ]] ; then
         if ! grep -q '.profile' "$rcfile" ; then
           echo "    Adding 'if [[ -s \$HOME/.profile ]] ; then source \$HOME ; fi' to $rcfile."
@@ -192,26 +196,26 @@ fi
 #
 spinner
 if [[ -d gemsets/ ]] ; then
-  mkdir -p "$rvm_gemsets_path"
+  \mkdir -p "$rvm_gemsets_path"
   for gemset_file in $(cd gemsets ; find . -iname '*.gems' | sed 's/^\.\///') ; do
     destination="$rvm_gemsets_path/$gemset_file"
     destination_path="$(dirname "$destination")"
     if [[ ! -s "$destination" ]] ; then
-      mkdir -p "$destination_path"
-      cp "gemsets/$gemset_file" "$destination"
+      \mkdir -p "$destination_path"
+      \cp "gemsets/$gemset_file" "$destination"
     fi
   done ; unset destination destination_path gemset_file
 fi
 
 spinner
 if [[ -d patchsets/ ]] ; then
-  mkdir -p "$rvm_patchsets_path"
+  \mkdir -p "$rvm_patchsets_path"
   for patchset_file in $(cd patchsets ; find . -iname '*' | sed 's/^\.\///') ; do
     destination="$rvm_patchsets_path/$patchset_file"
     destination_path="$(dirname "$destination")"
     if [[ ! -s "$destination" ]] ; then
-      mkdir -p "$destination_path"
-      cp "patchsets/$patchset_file" "$destination"
+      \mkdir -p "$destination_path"
+      \cp "patchsets/$patchset_file" "$destination"
     fi
   done ; unset destination destination_path patchset_file
 fi
@@ -220,7 +224,7 @@ fi
 # Migrate ~/.rvm/ruby-X,jruby-X,... to ~/.rvm/rubies/ for 0.1.0.
 #
 rvm_rubies_path="${rvm_rubies_path:-"$rvm_path/rubies"}"
-mkdir -p "$rvm_rubies_path/"
+\mkdir -p "$rvm_rubies_path/"
 spinner
 for ruby in $rvm_path/ruby-* $rvm_path/jruby-* $rvm_path/mput-* $rvm_path/rbx-* $rvm_path/maglev-* $rvm_path/ree-* ; do
   if [[ -d "$ruby" ]] ; then
@@ -276,7 +280,7 @@ if [[ -s "$rvm_config_path/default" ]]; then
     $rvm_scripts_path/alias create default "$original_version" &> /dev/null
   fi
   unset original_version
-  rm -rf "$rvm_config_path/default"
+  \rm -rf "$rvm_config_path/default"
 fi
 
 #
@@ -284,14 +288,14 @@ fi
 #
 
 printf "\n    Correct permissions for base binaries in $rvm_bin_path..."
-mkdir -p $rvm_bin_path
+\mkdir -p $rvm_bin_path
 for file in rvm rvmsudo rvm-shell rvm-auto-ruby; do
   [[ -s "$rvm_bin_path/$file" ]] && chmod +x "$rvm_bin_path/$file"
 done; unset file
 printf "\n    Copying manpages into place."
 for man_file in $(\ls "$install_source_path/man"); do
-  rm -rf "$rvm_man_path/$man_file"
-  cp -R "$install_source_path/man/$man_file" "$rvm_man_path/"
+  \rm -rf "$rvm_man_path/$man_file"
+  \cp -R "$install_source_path/man/$man_file" "$rvm_man_path/"
 done
 
 [[ "$upgrade_flag" = 0 ]] && ./scripts/notes
@@ -315,14 +319,14 @@ if [[ "$upgrade_flag" -eq 1 ]] ; then
   check_rubyopt_conditions
   printf "\nUpgrade of RVM in $rvm_path/ is complete.\n\n"
 else
-  if [[ -z "$rvm_prefix" ]] && [[ "root" != "$(whoami)" ]] ; then
+  if [[ "$rvm_selfcontained" = "1" ]] ; then
     printf "\n$(tput setaf 1)You must now finish the install manually:$(tput sgr0)"
     printf "\n1) Place the folowing line at the end of your shell's loading files(.bashrc or .bash_profile for bash and .zshrc for zsh), after all path/variable settings:"
     printf "\n     [[ -s \$HOME/.rvm/scripts/rvm ]] && source \$HOME/.rvm/scripts/rvm"
     printf "\n   Please note that this must only occur once - so, you only need to add it the first time you install rvm."
     printf "\n2) Ensure that there is no 'return' from inside the .bashrc file. (otherwise rvm will be prevented from working properly)."
-    printf "\n   This means that if you see '[ -z "\$PS1" ] && return' then you must change this line to:"
-    printf "\n   if [[ -n "\$PS1" ]] ; then"
+    printf "\n   This means that if you see '[ -z \"\$PS1\" ] && return' then you must change this line to:"
+    printf "\n   if [[ -n \"\$PS1\" ]] ; then"
     printf "\n     ... original content that was below the && return line ..."
     printf "\n   fi # <= be sure to close the if."
     printf "\n   #EOF .bashrc"
@@ -331,10 +335,10 @@ else
     printf "\n   placing all non-interactive items in the .bashrc, including the 'source' line above"
     printf "\n3) Then $(tput setaf 1)CLOSE THIS SHELL$(tput sgr0) and open a new one in order to use rvm.\n"
   fi
-  if [[ -s $HOME/.bashrc ]] && grep -q '&& return' $HOME/.bashrc ; then
+  if [[ -s "$HOME/.bashrc" ]] && grep -q '&& return' "$HOME/.bashrc" ; then
     printf "\n\nWARNING:  you have a 'return' statement in your .bashrc, likely this will cause untold havoc."
-    printf "\n   This means that if you see '[ -z "\$PS1" ] && return' then you must change this line to:"
-    printf "\n   if [[ -n "\$PS1" ]] ; then"
+    printf "\n   This means that if you see '[ -z \"\$PS1\" ] && return' then you must change this line to:"
+    printf "\n   if [[ -n \"\$PS1\" ]] ; then"
     printf "\n     ... original content that was below the && return line ..."
     printf "\n   fi # <= be sure to close the if."
     printf "\n   #EOF .bashrc"

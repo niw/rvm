@@ -148,6 +148,10 @@ gemset_dir() {
 gemset_create() {
   local gem_home gemset gemsets prefix
 
+  if [[ -n "$rvm_ruby_string" ]] ; then
+    __rvm_select
+  fi
+
   prefix=$(echo $rvm_ruby_gem_home | sed 's/'${rvm_gemset_separator:-"@"}'.*$//')
 
   gemsets=(${args[@]})
@@ -155,7 +159,14 @@ gemset_create() {
   for gemset in "${gemsets[@]}" ; do
 
     if [[ "$gemset" == *"${rvm_gemset_separator:-"@"}"* ]]; then
-      "$rvm_path/scripts/log" "error" "Can't do that, it contains a \"${rvm_gemset_separator:-"@"}\"."
+      "$rvm_path/scripts/log" "error" \
+        "Can not create gemset '$gemset', it contains a \"${rvm_gemset_separator:-"@"}\"."
+      continue
+    fi
+
+    if [[ -z "$gemset" || "$gemset" = *"${rvm_gemset_separator:-"@"}" ]] ; then
+      "$rvm_path/scripts/log" "error" \
+        "Can not create gemset '$gemset', Missing name. "
       continue
     fi
 
@@ -330,12 +341,14 @@ gemset_copy() {
   destination_path="$(rvm_silence_logging=1 rvm "$destination_ruby" gem env gemdir)"
 
   if [[ -z "$source_path" || ! -d "$source_path" ]]; then
-    "$rvm_path/scripts/log" "error" "Unable to expand '$source_ruby' or directory does not exist."
+    "$rvm_path/scripts/log" "error" \
+      "Unable to expand '$source_ruby' or directory does not exist."
     return 1
   fi
 
   if [[ -z "$destination_path" ]]; then
-    "$rvm_path/scripts/log" "error" "Unable to expand '$destination_ruby'"
+    "$rvm_path/scripts/log" "error" \
+      "Unable to expand '$destination_ruby'"
     return 1
   fi
 
@@ -763,8 +776,8 @@ gemset_initial() {
   "$rvm_path/scripts/log" "info" \
     "Importing initial gemsets for $(__rvm_environment_identifier)."
 
-  if [[ ! -d "$rvm_gemsets_path/${rvm_ruby_string//-/\/}" ]] ; then
-    mkdir -p "$rvm_gemsets_path/${rvm_ruby_string//-/\/}" 2>/dev/null
+  if [[ ! -d "$rvm_gemsets_path/${rvm_ruby_string//-//}" ]] ; then
+    mkdir -p "$rvm_gemsets_path/${rvm_ruby_string//-//}" 2>/dev/null
   fi
 
   paths=($(__rvm_ruby_string_paths_under "$rvm_gemsets_path"))

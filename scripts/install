@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
 set -o errtrace
-set -o errexit
 
 export PS4='+[${BASH_SOURCE}] : ${LINENO} : ${FUNCNAME[0]:+${FUNCNAME[0]}() $ }'
 
 if [[ -z "$rvm_selfcontained" ]]; then
-  if [[ "root" = "$(whoami)" \
-    || -n "$rvm_prefix" && "$rvm_prefix" != "$HOME"/* ]]; then
+  if [[ $(id | sed -e 's/(.*//' | awk -F= '{print $2}') -eq 0 || \
+    -n "$rvm_prefix" && "$rvm_prefix" != "$HOME"/* ]]; then
     export rvm_selfcontained=0
   else
     export rvm_selfcontained=1
@@ -43,7 +42,7 @@ usage()
 
     --version : display rvm package version
 
-  "
+  \n"
 }
 
 check_rubyopt_conditions()
@@ -127,7 +126,7 @@ andand_return_warning()
 thank_you()
 {
   printf "
-${name:-"$(whoami)"},
+${name:-"${USER:-$(id | sed -e 's/^[^(]*(//' -e 's/).*$//')}"},
 
 Thank you very much for using RVM! I sincerely hope that RVM helps to
 make your work both easier and more enjoyable.
@@ -146,7 +145,7 @@ question, I will respond as soon as I am back.  It is best to talk in
 #rvm itself as then other users can help out should I be offline.
 
 Be sure to get head often as rvm development happens fast,
-you can do this by running 'rvm update --head' followed by 'rvm reload'
+you can do this by running 'rvm get head' followed by 'rvm reload'
 or opening a new shell
 
   w⦿‿⦿t
@@ -162,6 +161,8 @@ upgrade_notes()
 
 Upgrade Notes
 
+  * rvm_trust_rvmrcs has been changed to rvm_trust_rvmrcs_flag for consistency
+
   * Ruby package dependency list for your OS is given by:
     rvm notes
 
@@ -170,6 +171,9 @@ Upgrade Notes
 
   * If you wish to have the 'pretty colors' again, set in ~/.rvmrc:
     export rvm_pretty_print_flag=1
+
+  * If you see the following error message: Unknown alias name: 'default'
+    re-set your default ruby, this is due to a change in how default works.
 "
 }
 
@@ -190,17 +194,36 @@ while [[ $# -gt 0 ]] ; do
       env | grep '^rvm_'
       set -o xtrace
       ;;
-    --help|*)  usage ;;
+    --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unrecognized option: $token"
+      usage
+      exit 1
+      ;;
   esac
 done
 
-if [[ -z "${rvm_prefix:-""}" ]] ; then
-  __rvm_load_rvmrc
-  if [[ "$rvm_selfcontained" = "0" ]] ; then
-    rvm_prefix="${rvm_prefix:-"/usr/local/"}"
+if [[ -z "${rvm_prefix:-""}"  ]] ; then
+
+  if [[ "$USER" = "root" ]] ; then
+
+    source /etc/rvmrc
+
+    if [[ ${rvm_selfcontained:-0} -eq 0 ]] ; then
+      rvm_prefix="${rvm_prefix:-"/usr/local/"}"
+    else
+      rvm_prefix="${rvm_prefix:-"$HOME/."}"
+    fi
+
   else
+
     rvm_prefix="${rvm_prefix:-"$HOME/."}"
+
   fi
+
 fi
 
 if [[ -z "${rvm_path:-""}" ]] ; then
@@ -331,6 +354,12 @@ for script_name in "${scripts[@]}" ; do
 done
 
 #
+# Config Scripts
+#
+if [[ ! -f "$rvm_path/config/rvmrcs" ]] ; then
+  touch "$rvm_path/config/rvmrcs"
+fi
+#
 # Bin Scripts
 #
 # Cleanse and purge...
@@ -342,9 +371,9 @@ for file in "${files[@]}" ; do
 
   cp -f "$source_path/binscripts/$file" "${rvm_bin_path:-"$rvm_path/bin"}/"
 
-done
+  chmod +x "${rvm_bin_path:-"$rvm_path/bin"}/$file"
 
-chmod +x "${rvm_bin_path:-"$rvm_path/bin"}"/* # TODO: this is quite suboptimal.
+done
 
 #
 # RC Files
@@ -366,8 +395,8 @@ if [[ ${rvm_auto_flag:-0} -eq 1 ]] ; then
           echo "    Adding profile sourcing line to $rcfile."
 
           printf "
-# rvm-install added line:
-[[ -s \$HOME/.profile ]] && source \$HOME/.profile
+# rvm install added line:
+[[ -s \"$rvm_path/.profile\" ]] && source \"$rvm_path/.profile\"
 " >> "$rcfile"
 
         fi
@@ -379,7 +408,7 @@ if [[ ${rvm_auto_flag:-0} -eq 1 ]] ; then
         echo "    Adding rvm loading line to $rcfile."
 
         printf "
-# rvm-install added:
+# rvm install added:
 [[ -s \"$rvm_path/.rvm/scripts/rvm\" ]] && . \"$rvm_path/.rvm/scripts/rvm\"
 " >> "$rcfile"
 
@@ -403,6 +432,7 @@ if [[ -d gemsets/ ]] ; then
   for gemset_file in $(find "$PWD/gemsets" -iname '*.gems' | sed 's/^\.\///') ; do
 
     cwd="${PWD//\//\\/}\/gemsets\/"
+
     destination="$rvm_path/gemsets/${gemset_file/$cwd}"
 
     destination_path="$(dirname "$destination")"
@@ -416,8 +446,6 @@ if [[ -d gemsets/ ]] ; then
     fi
 
   done
-
-  unset destination destination_path gemset_file
 
 fi
 
@@ -453,7 +481,7 @@ fi
 #
 mkdir -p "${rvm_rubies_path:-"$rvm_path/rubies"}/"
 
-for ruby in $rvm_path/ruby-* $rvm_path/jruby-* $rvm_path/mput-* \
+for ruby in $rvm_path/ruby-* $rvm_path/jruby-* $rvm_path/goruby\
   $rvm_path/rbx-* $rvm_path/maglev-* $rvm_path/ree-* ; do
 
   if [[ -d "$ruby" ]] ; then
@@ -484,6 +512,18 @@ done
 # End of rubies migration.
 #
 
+if [[ -d "$rvm_path/environments" ]] ; then
+  #
+  # Remove BUNDLE_PATH from environment files
+  #
+  environments=($( find "$rvm_path/environments" -maxdepth 1 -mindepth 1 -type f ))
+  for file in "${environments[@]}" ; do
+    if grep 'BUNDLE_PATH' "$file" > /dev/null ; then
+      grep -v 'BUNDLE_PATH' "$file" > "$file.new"
+      mv "$file.new" "$file"
+    fi
+  done
+fi
 #
 # Migrate old gemset directories to new gemset pattern.
 #
@@ -565,7 +605,7 @@ for file in "${files[@]}" ; do
 
 done
 
-printf "\n    Copying manpages into place."
+printf "\n    Copying manpages into place.\n"
 
 files=($(builtin cd "$install_source_path/man" ; \
   find . -maxdepth 1 -mindepth 1 -type f -print))
@@ -598,7 +638,9 @@ if [[ $upgrade_flag -eq 0 ]] ; then
   ./scripts/notes
 fi
 
-name="$(awk -F= '/^[[:space:]]*name/{print $2}' ~/.gitconfig 2>/dev/null)"
+if command -v git > /dev/null 2>&1 ; then
+  name="$(git config user.name 2>/dev/null)"
+fi
 
 if [[ ${upgrade_flag:-0} -eq 1 ]] ; then
 

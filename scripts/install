@@ -359,11 +359,6 @@ for directory in ${directories[@]} ; do
 
 done
 
-if [[ ! -s "$rvm_config_path/user" ]] ; then
-  echo '# User settings, overrides db settings and persists across installs.' \
-    >> "$rvm_config_path/user"
-fi
-
 scripts=(monitor match log install color db fetch log set package)
 
 for script_name in "${scripts[@]}" ; do

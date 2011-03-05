@@ -1,29 +1,31 @@
 #!/usr/bin/env bash
 
 set -o errtrace
+sys=$( uname -s )
+if [[ "${sys}" = AIX ]] ; then
+    name_opt=-name
+else
+    name_opt=-iname
+fi
 
 export PS4='+[${BASH_SOURCE}] : ${LINENO} : ${FUNCNAME[0]:+${FUNCNAME[0]}() $ }'
 
 if [[ -z "$rvm_selfcontained" ]]; then
+
   if [[ $(id | sed -e 's/(.*//' | awk -F= '{print $2}') -eq 0 || \
     -n "$rvm_prefix" && "$rvm_prefix" != "$HOME"/* ]]; then
+
     export rvm_selfcontained=0
+
   else
+
     export rvm_selfcontained=1
+
   fi
+
 fi
 
 unset rvm_auto_flag
-
-install_source_path="$(dirname "$0" | sed 's#\/scripts$##')"
-
-if [[ -d "$install_source_path/scripts" \
-  && -s "$install_source_path/scripts/utility" ]] ; then
-  builtin cd "$install_source_path"
-fi
-
-source scripts/version
-source scripts/utility
 
 usage()
 {
@@ -205,12 +207,13 @@ while [[ $# -gt 0 ]] ; do
       ;;
   esac
 done
-
 if [[ -z "${rvm_prefix:-""}"  ]] ; then
 
-  if [[ "$USER" = "root" ]] ; then
+  if [[ $(id | sed -e 's/(.*//' | awk -F= '{print $2}') -eq 0 ]] ; then
 
-    source /etc/rvmrc
+    if [[ -s /etc/rvmrc ]] ; then
+      source /etc/rvmrc
+    fi
 
     if [[ ${rvm_selfcontained:-0} -eq 0 ]] ; then
       rvm_prefix="${rvm_prefix:-"/usr/local/"}"
@@ -229,8 +232,6 @@ fi
 if [[ -z "${rvm_path:-""}" ]] ; then
   rvm_path="${rvm_prefix}rvm"
 fi
-
-source scripts/initialize
 
 if grep -q 'scripts/rvm' "$HOME"/.bash* 2>/dev/null \
   || grep -q 'scripts/rvm' "$HOME"/.zsh* 2>/dev/null ; then
@@ -251,29 +252,34 @@ else
 
 fi
 
-__rvm_initialize
 
 #
 # Setup & Configuration
+#
+
+install_source_path="$(dirname "$0" | sed 's#\/scripts$##')"
+if [[ -d "$install_source_path/scripts" \
+  && -s "$install_source_path/scripts/functions/utility" ]] ; then
+  builtin cd "$install_source_path"
+fi
+
+# Save scripts path
+scripts_path=${rvm_scripts_path:-""}
+rvm_scripts_path="$PWD/scripts"
+# Load scripts.
+source scripts/initialize
+source scripts/functions/init
+source scripts/version
+__rvm_initialize # What does this do that scripts/initialize not do?
+
+# Restore Scripts Path
+rvm_scripts_path=${scripts_path:-"$rvm_path/scripts"}
 #
 item="* "
 question="\n<?>"
 cwd="$PWD"
 
 source_path="${source_path:-$cwd}"
-
-if [[ "$rvm_selfcontained" = "0" ]] ; then
-  rvm_bin_path="${rvm_bin_path:-"${rvm_prefix}bin"}"
-  rvm_man_path="${rvm_man_path:-"${rvm_prefix}share/man"}"
-  rvm_rc_files="${rvm_rc_files:-"/etc/profile /etc/zshenv"}"
-else
-  rvm_man_path="${rvm_man_path:-"$rvm_path/man"}"
-  rvm_bin_path="${rvm_bin_path:-"$rvm_path/bin"}"
-  rvm_rc_files="${rvm_rc_files:-"$HOME/.bash_profile $HOME/.bashrc $HOME/.zshenv"}"
-fi
-
-rvm_gems_path="${rvm_gems_path:-"$rvm_path/gems"}"
-rvm_tmp_path="${rvm_tmp_path:-"$rvm_path/tmp"}"
 
 printf "
   RVM:  Shell scripts enabling management of multiple ruby environments.
@@ -292,28 +298,24 @@ else
 fi
 
 directories=(
-  "${rvm_archives_path:-"$rvm_path/archives"}"
-  "${rvm_src_path:-"$rvm_path/src"}"
-  "${rvm_log_path:-"$rvm_path/log"}"
-  "$rvm_bin_path"
-  "${rvm_gems_path:-"$rvm_path/gems"}"
-  "${rvm_rubies_path:-"$rvm_path/rubies"}"
-  "$rvm_path/config"
-  "${rvm_tmp_path:-"$rvm_path/tmp"}"
-  "$rvm_path/bin"
+  "${rvm_archives_path:="$rvm_path/archives"}"
+  "${rvm_src_path:="$rvm_path/src"}"
+  "${rvm_log_path:="$rvm_path/log"}"
+  "${rvm_bin_path:="$rvm_path/bin"}"
+  "${rvm_gems_path:="$rvm_path/gems"}"
+  "${rvm_rubies_path:="$rvm_path/rubies"}"
+  "${rvm_config_path:="$rvm_path/config"}"
+  "${rvm_user_path:="$rvm_path/user"}"
+  "${rvm_tmp_path:="$rvm_path/tmp"}"
   )
 
 for directory in "${directories[@]}" ; do
 
-  if [[ ! -d "$directory" ]] ; then
-
-    mkdir -p "$directory"
-
-  fi
+  [[ -d "$directory" ]] || mkdir -p "$directory"
 
 done
 
-files=(README LICENCE)
+files=(README LICENCE VERSION)
 
 for file in "${files[@]}"; do
 
@@ -322,43 +324,77 @@ for file in "${files[@]}"; do
 done
 
 #
-# Scripts
+# Remove old files that no longer exist.
 #
-for dir_name in config scripts examples lib hooks help patches; do
+[[ -f "$rvm_path/scripts/utility" ]] && rm -f "$rvm_path/scripts/utility"
+[[ -f "$rvm_path/scripts/array" ]] && rm -f "$rvm_path/scripts/array"
 
-  if [[ -d "$source_path/$dir_name" ]] ; then
+#
+# Copy all install directory scripts
+#
 
-    if [[ ! -d "$rvm_path/$dir_name" ]] ; then
+directories=(config scripts examples lib hooks help patches)
 
-      mkdir -p "$rvm_path/$dir_name"
+for directory in ${directories[@]} ; do
+
+  for entry in $(find $directory 2>/dev/null); do
+
+    if [[ -f "$source_path/$entry" ]] ; then
+
+      # Target is supposed to be a file, remove if it is a directory.
+      if [[ -d "$rvm_path/$entry" ]]; then __rvm_rm_rf "$rvm_path/$entry" ; fi
+
+      cp -f "$source_path/$entry" "$rvm_path/$entry"
+
+    elif [[ -d "$source_path/$entry" ]] ; then
+
+      # Target is supposed to be a directory, remove if it is a file.
+      if [[ -f "$rvm_path/$entry" ]]; then rm -f "$rvm_path/$entry" ; fi
+
+      if [[ ! -d "$rvm_path/$entry" ]] ; then mkdir -p "$rvm_path/$entry" ; fi
 
     fi
 
-    cp -Rf "$source_path/$dir_name" "$rvm_path"
-
-  fi
+  done
 
 done
 
-if [[ ! -s "$rvm_path/config/user" ]] ; then
+if [[ ! -s "$rvm_config_path/user" ]] ; then
   echo '# User settings, overrides db settings and persists across installs.' \
-    >> "$rvm_path/config/user"
+    >> "$rvm_config_path/user"
 fi
 
 scripts=(monitor match log install color db fetch log set package)
 
 for script_name in "${scripts[@]}" ; do
 
-  chmod +x "$rvm_path/scripts/$script_name" 2>/dev/null # Hide errors.
+  chmod +x "$rvm_scripts_path/$script_name" 2>/dev/null # Hide errors.
 
 done
 
 #
 # Config Scripts
 #
-if [[ ! -f "$rvm_path/config/rvmrcs" ]] ; then
-  touch "$rvm_path/config/rvmrcs"
-fi
+(
+  cd "$rvm_path"
+
+  if [[ ! -f config/user ]]; then
+    mv config/user user/db
+  fi
+
+  if [[ ! -f user/db ]]; then
+    touch user/db
+  fi
+
+  if [[ -s config/rvmrcs ]] ; then
+    mv config/rvmrcs user/rvmrcs
+  else
+    if [[ ! -f user/rvmrcs ]] ; then
+      touch user/rvmrcs
+    fi
+  fi
+)
+
 #
 # Bin Scripts
 #
@@ -369,9 +405,9 @@ for file in "${files[@]}" ; do
 
   rm -f "$rvm_bin_path/$file"
 
-  cp -f "$source_path/binscripts/$file" "${rvm_bin_path:-"$rvm_path/bin"}/"
+  cp -f "$source_path/binscripts/$file" "${rvm_bin_path}/"
 
-  chmod +x "${rvm_bin_path:-"$rvm_path/bin"}/$file"
+  chmod +x "${rvm_bin_path}/$file"
 
 done
 
@@ -409,7 +445,7 @@ if [[ ${rvm_auto_flag:-0} -eq 1 ]] ; then
 
         printf "
 # rvm install added:
-[[ -s \"$rvm_path/.rvm/scripts/rvm\" ]] && . \"$rvm_path/.rvm/scripts/rvm\"
+[[ -s \"$rvm_scripts_path/rvm\" ]] && . \"$rvm_scripts_path/rvm\"
 " >> "$rcfile"
 
       fi
@@ -429,7 +465,7 @@ if [[ -d gemsets/ ]] ; then
 
   fi
 
-  for gemset_file in $(find "$PWD/gemsets" -iname '*.gems' | sed 's/^\.\///') ; do
+  for gemset_file in $(find "$PWD/gemsets" "${name_opt}" '*.gems' | sed 's/^\.\///') ; do
 
     cwd="${PWD//\//\\/}\/gemsets\/"
 
@@ -457,7 +493,7 @@ if [[ -d patchsets/ ]] ; then
 
   fi
 
-  patchsets=($(builtin cd patchsets ; find \. -iname '*' | sed 's/^\.\///'))
+  patchsets=($(builtin cd patchsets ; find \. "${name_opt}" '*' | sed 's/^\.\///'))
 
   for patchset_file in "${patchsets[@]}" ; do
 
@@ -479,16 +515,16 @@ fi
 #
 # Migrate ~/.rvm/ruby-X,jruby-X,... to ~/.rvm/rubies/ for 0.1.0.
 #
-mkdir -p "${rvm_rubies_path:-"$rvm_path/rubies"}/"
+mkdir -p "${rvm_rubies_path:-"$rvm_rubies_path"}/"
 
 for ruby in $rvm_path/ruby-* $rvm_path/jruby-* $rvm_path/goruby\
   $rvm_path/rbx-* $rvm_path/maglev-* $rvm_path/ree-* ; do
 
   if [[ -d "$ruby" ]] ; then
 
-    mv "$ruby" "${rvm_rubies_path:-"$rvm_path/rubies"}/"
+    mv "$ruby" "${rvm_rubies_path:-"$rvm_rubies_path"}/"
 
-    new_path="${rvm_rubies_path:-"$rvm_path/rubies"}/$(basename $ruby)"
+    new_path="${rvm_rubies_path:-"$rvm_rubies_path"}/$(basename $ruby)"
 
     for file in gem rake ; do
 
@@ -570,18 +606,18 @@ for gemset in "$rvm_path"/gems/*\@ ; do
 done
 
 # Move from legacy defaults to the new, alias based system.
-if [[ -s "$rvm_path/config/default" ]]; then
+if [[ -s "$rvm_config_path/default" ]]; then
 
-  original_version="$(basename "$(grep GEM_HOME "$rvm_path/config/default" \
+  original_version="$(basename "$(grep GEM_HOME "$rvm_config_path/default" \
     | awk -F"'" '{print $2}' | sed "s#\%#${rvm_gemset_separator:-"@"}#")")"
 
   if [[ -n "$original_version" ]]; then
 
-    "$rvm_path/scripts/alias" create default "$original_version" &> /dev/null
+    "$rvm_scripts_path/alias" create default "$original_version" &> /dev/null
 
   fi ; unset original_version
 
-  rm -rf "$rvm_path/config/default"
+  __rvm_rm_rf "$rvm_config_path/default"
 
 fi
 
@@ -592,14 +628,14 @@ declare -a files
 
 printf "\n    Correct permissions for base binaries in $rvm_bin_path..."
 
-mkdir -p "${rvm_bin_path:-"$rvm_path/bin"}"
+mkdir -p "${rvm_bin_path}"
 
 files=(rvm rvmsudo rvm-shell rvm-auto-ruby)
 for file in "${files[@]}" ; do
 
-  if [[ -s "${rvm_bin_path:-"$rvm_path/bin"}/$file" ]] ; then
+  if [[ -s "${rvm_bin_path}/$file" ]] ; then
 
-    chmod +x "${rvm_bin_path:-"$rvm_path/bin"}/$file"
+    chmod +x "${rvm_bin_path}/$file"
 
   fi
 
@@ -612,13 +648,11 @@ files=($(builtin cd "$install_source_path/man" ; \
 
 for file in "${files[@]//.\/}" ; do
 
-  rm -rf "$rvm_man_path/$file"
-
-  cp -R "$install_source_path/man/$file" "$rvm_man_path/"
+  cp -Rf "$install_source_path/man/$file" "$rvm_man_path/"
 
 done
 
-files=($( find "$rvm_path/" -mindepth 1 -maxdepth 2 -iname '*.swp' -type f ))
+files=($( find "$rvm_path/" -mindepth 1 -maxdepth 2 "${name_opt}" '*.swp' -type f ))
 
 if [[ ${#files[@]} -gt 0 ]] ; then
 

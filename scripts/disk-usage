@@ -2,7 +2,7 @@
 
 #!/usr/bin/env bash
 rvm_base_except="selector"
-source "$rvm_path/scripts/base"
+source "$rvm_scripts_path/base"
 
 usage()
 {
@@ -13,7 +13,7 @@ usage()
 
 disk_usage_for_directory()
 {
-  du -hs "$1" | awk '{print $1}'
+  du -hs "${1}/" | awk '{print $1}'
 }
 
 disk_usage()

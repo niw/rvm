@@ -54,6 +54,8 @@
 # RVM::Environment.new, versus RVM.environment
 #
 module RVM
+  VERSION = "1.2.7"
+
   require 'rvm/errors'
 
   autoload :Shell,       'rvm/shell'

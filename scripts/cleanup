@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
+
 rvm_base_except="selector"
-source "$rvm_path/scripts/base"
+source "$rvm_scripts_path/base"
 
 usage()
 {
@@ -19,19 +20,19 @@ return 0
 
 cleanup()
 {
-  local cleanup_type current_path
+  local cleanup_type current_path entry
 
   for cleanup_type in $1; do
 
     current_path="${rvm_path}/${cleanup_type}"
 
-    if [[ -n "$current_path" && -d "$current_path" \
-      && "$current_path" != "/" ]]; then
+    if [[ -n "$current_path" && -d "$current_path" && "$current_path" != "/" ]]; then
 
-      "$rvm_path/scripts/log" "info" \
-        "Cleaning up rvm directory '$current_path'"
+      rvm_log "Cleaning up rvm directory '$current_path'"
 
-      rm -rf "$current_path"/* >/dev/null 2>&1
+      for entry in "$current_path"/* ; do
+        __rvm_rm_rf "$entry"
+      done
 
     fi
 

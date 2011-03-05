@@ -2,9 +2,7 @@
 
 rvm_base_except="selector"
 
-source "$rvm_path/scripts/base"
-
-rvm_help_path="${rvm_help_path:-"$rvm_path/help"}"
+source "$rvm_scripts_path/base"
 
 args=($*)
 
@@ -15,7 +13,7 @@ args=(${args[@]})
 action="${args[$array_start]}"
 args[$__array_start]=""
 args=(${args[@]})
-pager="${PAGER:-less -X}"
+pager="${PAGER:-cat -v}"
 
 if [[ -n "$command" && -s "${rvm_help_path}/${command}" ]] ; then
 
@@ -33,14 +31,11 @@ else
 
   eval "$pager '${rvm_path:-$HOME/.rvm}/README'"
 
-  "$rvm_path/scripts/log" "info" \
-    "Commands available with 'rvm help':\n\n    $(builtin cd "${rvm_help_path}" ; find . -maxdepth 1 -mindepth 1 -type f -print | \tr "\n" ' ' | sed -e 's#./##g')"
+  rvm_log "Commands available with 'rvm help':\n\n    $(builtin cd "${rvm_help_path}" ; find . -maxdepth 1 -mindepth 1 -type f -print | \tr "\n" ' ' | sed -e 's#./##g')"
 fi
 
-"$rvm_path/scripts/log" "info" \
-  "For additional information please visit RVM's documentation website:\n\n    http://rvm.beginrescueend.com/"
+rvm_log "For additional information please visit RVM's documentation website:\n\n    http://rvm.beginrescueend.com/"
 
-"$rvm_path/scripts/log" "info" \
-  "If you still cannot find what an answer to your question, find me 'wayneeseguin' in #rvm on irc.freenode.net:\n\n    http://webchat.freenode.net/?channels=rvm\n"
+rvm_log "If you still cannot find what an answer to your question, find me 'wayneeseguin' in #rvm on irc.freenode.net:\n\n    http://webchat.freenode.net/?channels=rvm\n"
 
 exit $?

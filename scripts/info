@@ -2,9 +2,8 @@
 
 if [[ "$rvm_trace_flag" -eq 2 ]] ; then set -x ; export rvm_trace_flag ; fi
 
-source "$rvm_path/scripts/base"
-
-source "$rvm_path/scripts/version"
+source "$rvm_scripts_path/base"
+source "$rvm_scripts_path/version"
 
 version_for()
 {
@@ -85,7 +84,7 @@ info_environment()
     MY_RUBY_HOME: \"${MY_RUBY_HOME:-""}\"
     IRBRC:        \"${IRBRC:-""}\"
     RUBYOPT:      \"${RUBYOPT:-""}\"
-    gemset:       \"$(printf "${GEM_HOME:-""}" | awk -F${rvm_gemset_separator:-"@"} '{print $2}')\"\n
+    gemset:       \"$(__rvm_current_gemset)\"\n
 "
 
   if [[ -n "${MAGLEV_HOME:-""}" ]] ; then
@@ -100,10 +99,10 @@ info_debug()
   rvm_info="
 
 $(__rvm_version)
-  $("$rvm_path/scripts/info" "$rvm_ruby_string" "" )
+  $("$rvm_scripts_path/info" "$rvm_ruby_string" "" )
   PATH:\n$(printf "$PATH" | awk -F":" '{print $1":"$2":"$3":"$4":"$5}' )
   uname -a: $(uname -a)
-  permissions: $(\ls -la "$rvm_path" "$rvm_path/rubies")
+  permissions: $(\ls -la "$rvm_path" "$rvm_rubies_path")
 "
 
   if [[ "Darwin" = "$(uname)" ]] ; then
@@ -130,11 +129,11 @@ $(__rvm_version)
 
   if [[ "$rvm_selfcontained" = "0" ]] ; then
 
-   debug_files=("$rvm_path/config/alias" "$rvm_path/config/system" "$rvm_path/config/db" "/etc/rvmrc" "/etc/gemrc")
+   debug_files=("$rvm_config_path/alias" "$rvm_config_path/system" "$rvm_config_path/db" "/etc/rvmrc" "/etc/gemrc")
 
   else
 
-  debug_files=("$rvm_path/config/alias" "$rvm_path/config/system" "$rvm_path/config/db" "$HOME/.rvmrc" "$HOME/.gemrc")
+  debug_files=("$rvm_config_path/alias" "$rvm_config_path/system" "$rvm_config_path/db" "$HOME/.rvmrc" "$HOME/.gemrc")
 
   fi
 
@@ -156,7 +155,11 @@ info_sections()
 
   for section in $(printf "${sections//,/ }") ; do
 
-    rvm_info="" ; "info_${section}" ; printf "$rvm_info"
+    rvm_info=""
+
+    "info_${section}"
+
+    printf "$rvm_info"
 
   done
 
@@ -179,11 +182,11 @@ args=(${args[@]})
 sections="${args// /}"
 all_sections="system rvm ruby homes binaries environment"
 
-if "$rvm_path/scripts/match" "$all_sections debug" "${ruby_strings/,*/}" ; then
-
+# TODO: Figure out what was the thought here and remove external match script
+#       dependency
+if "$rvm_scripts_path/match" "$all_sections debug" "${ruby_strings/,*/}" ; then
   sections="$ruby_strings"
   ruby_strings=""
-
 fi
 
 if [[ -z "${sections// /}" ]] ; then

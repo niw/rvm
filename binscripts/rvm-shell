@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
+true ${rvm_scripts_path:="$rvm_path/scripts"}
+
 __rvm_shell_lookup_script() {
   local relative_scripts_dir
   relative_scripts_dir="$(dirname -- "$(dirname -- "$0")")/scripts"
-  for directory in "$rvm_path/scripts" "$HOME/.rvm/scripts" "/usr/local/rvm/scripts" "$relative_scripts_dir"; do
+  for directory in "$rvm_scripts_path" "$HOME/.rvm/scripts" "/usr/local/rvm/scripts" "$relative_scripts_dir"; do
     if [[ -d "$directory" && -s "$directory/rvm" ]]; then
       echo "$directory/rvm"
       return
@@ -11,7 +13,6 @@ __rvm_shell_lookup_script() {
   done
 }
 
-# If the first argument isn't -c, remove it and set it to the ruby string value.
 if [[ -n "$1" && ! -f "$1" && -n "$(echo "$1" | \grep -v '^-')" ]]; then
   rvm_shell_ruby_string="$1"
   shift

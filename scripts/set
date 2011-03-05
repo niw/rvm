@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$rvm_path/scripts/base"
+source "$rvm_scripts_path/base"
 
 __rvm_attempt_single_exec()
 {
@@ -21,7 +21,7 @@ __rvm_ruby_do()
   # Return on invalid rubies.
   __rvm_become "$current_set_ruby" || return 1
 
-  rvm_hook="before_do" ; source "$rvm_path/scripts/hook"
+  rvm_hook="before_do" ; source "$rvm_scripts_path/hook"
 
   if [[ "$action" = "exec" ]]; then
     # Exec is a special case.
@@ -49,8 +49,7 @@ __rvm_ruby_do()
 
     else
 
-      "$rvm_path/scripts/log" "warn" \
-        "'$binary not found for $rvm_ruby_string' either does not exist or is not executable? :("
+      rvm_warn "'$binary not found for $rvm_ruby_string' either does not exist or is not executable? :("
 
       __rvm_unset_ruby_variables
 
@@ -112,8 +111,7 @@ __rvm_ruby_do()
 
       fi
 
-      "$rvm_path/scripts/log" "info" \
-        "$current_env: $(ruby -v $rvm_ruby_mode | \tr "\n" ' ')\n"
+      rvm_log "$current_env: $(ruby -v $rvm_ruby_mode | \tr "\n" ' ')\n"
 
       unset current_env
     fi
@@ -139,7 +137,7 @@ __rvm_ruby_do()
 
   unset string
 
-  rvm_hook="after_do" ; source "$rvm_path/scripts/hook"
+  rvm_hook="after_do" ; source "$rvm_scripts_path/hook"
 
   __rvm_unset_ruby_variables
 }
@@ -165,7 +163,7 @@ __rvm_summary()
 
   total=${#rubies[*]}
 
-  if [[ -n "${ZSH_VERSION:-""}" ]] ; then array_start=1 ; else array_start=0 ; fi
+  [[ -z "${ZSH_VERSION:-}" ]] ; array_start=$?
 
   printf "$summary" | tee -a log/summary.log
 
@@ -190,13 +188,13 @@ __rvm_yaml()
 
   total=${#rubies[*]}
 
-  if [[ -n "${ZSH_VERSION:-""}" ]] ; then array_start=1 ; else array_start=0 ; fi
+  [[ -z "${ZSH_VERSION:-}" ]] ; array_start=$?
 
   for (( index = $array_start ; index < $total + $array_start ; index++ )) ; do
 
     if [[ ${rvm_debug_flag:-0} -gt 0 ]] ; then
 
-      "$rvm_path/scripts/log" "debug" "${rubies[$index]}: ${statuses[$index]}"
+      rvm_debug "${rubies[$index]}: ${statuses[$index]}"
 
     fi
 
@@ -223,13 +221,13 @@ __rvm_json()
 \"rubies\": { "
 
   total=${#rubies[*]}
-  if [[ -n "${ZSH_VERSION:-""}" ]] ; then array_start=1 ; else array_start=0 ; fi
+  [[ -z "${ZSH_VERSION:-}" ]] ; array_start=$?
 
   for (( index = $array_start ; index < $total + $array_start ; index++ )) ; do
 
     if [[ ${rvm_debug_flag:-0} -gt 0 ]] ; then
 
-      "$rvm_path/scripts/log" "debug" "${rubies[$index]}: ${statuses[$index]}"
+      rvm_debug "${rubies[$index]}: ${statuses[$index]}"
 
     fi
 
@@ -262,8 +260,7 @@ args=(${args[@]})
 
 if [[ -z "$action" ]] ; then
 
-  "$rvm_path/scripts/log" "error" \
-    "Action must be specified."
+  rvm_error "Action must be specified."
 
   exit 1
 
@@ -271,11 +268,8 @@ fi
 
 if [[ "$action" == "ruby" ]] && echo "$args" | \grep -q  "^'--[^[:space:]]*'$" ; then
 
-  "$rvm_path/scripts/log" "warn" \
-    "You called rvm ruby with the arguments $args which look like use options."
-
-  "$rvm_path/scripts/log" "warn" \
-    "Please note that 'rvm ruby' invokes set operations instead."
+  rvm_warn "You called rvm ruby with the arguments $args which look like use options.
+    Please note that 'rvm ruby' invokes set operations instead."
 
 fi
 
@@ -296,6 +290,6 @@ if [[ ! -z "$rvm_yaml_flag" ]]    ; then __rvm_yaml    ; fi
 
 if [[ ! -z "$rvm_json_flag" ]]    ; then __rvm_json    ; fi
 
-rvm_hook="after_do" ; source "$rvm_path/scripts/hook"
+rvm_hook="after_do" ; source "$rvm_scripts_path/hook"
 
 exit ${#errors[*]}

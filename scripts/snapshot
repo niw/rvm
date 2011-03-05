@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
 
+sys=$( uname -s )
+if [[ "${sys}" = AIX ]] ; then
+    name_opt=-name
+else
+    name_opt=-iname
+fi
+
 unset GREP_COLOR
 unset GREP_OPTIONS
 
-source "$rvm_path/scripts/base"
+source "$rvm_scripts_path/base"
 
 __error_on_result()
 {
   if [[ "$1" -gt 0 ]]; then
-    "$rvm_path/scripts/log" "fail" "$2 - Aborting now."
+    rvm_error "$2 - Aborting now."
     return 0
   else
     return 1
@@ -37,34 +44,34 @@ snapshot_save()
   fi
 
   # Create the temporary directory.
-  local snapshot_temp_path="${rvm_tmp_path:-"$rvm_path/tmp"}/$$-snapshot"
+  local snapshot_temp_path="${rvm_tmp_path}/$$-snapshot"
 
-  rm -rf "$snapshot_temp_path"
+  __rvm_rm_rf "$snapshot_temp_path"
 
   mkdir -p "$snapshot_temp_path"
 
-  "$rvm_path/scripts/log" "info" "Backing up a list of aliases"
-  cp "$rvm_path/config/alias" "$snapshot_temp_path/"
+  rvm_log "Backing up a list of aliases"
+  cp "$rvm_config_path/alias" "$snapshot_temp_path/"
 
-  "$rvm_path/scripts/log" "info" "Backing up your user preferences"
-  cp "$rvm_path/config/user" "$snapshot_temp_path/"
+  rvm_log "Backing up your user preferences"
+  cp "$rvm_config_path/user" "$snapshot_temp_path/"
 
-  "$rvm_path/scripts/log" "info" "Backing up your installed packages"
-  sed -e 's/-//' -e 's/^lib//' < "$rvm_path/config/packages" | awk -F= '{print $1}' | sort | uniq > "$snapshot_temp_path/packages"
+  rvm_log "Backing up your installed packages"
+  sed -e 's/-//' -e 's/^lib//' < "$rvm_config_path/packages" | awk -F= '{print $1}' | sort | uniq > "$snapshot_temp_path/packages"
 
-  "$rvm_path/scripts/log" "info" "Backing up all of your gemsets"
+  rvm_log "Backing up all of your gemsets"
   mkdir -p "$snapshot_temp_path/gems"
 
   (
     builtin cd "$snapshot_temp_path/gems"
 
-    for snapshot_gemset in $("$rvm_path/scripts/list" gemsets strings) ; do
+    for snapshot_gemset in $("$rvm_scripts_path/list" gemsets strings) ; do
 
       __rvm_become "$snapshot_gemset" ; result="$?"
 
       __error_on_result "$result" "Error becoming ruby $snapshot_gemset" && return "$result"
 
-      "$rvm_path/scripts/gemsets" export "${snapshot_gemset}.gems" >/dev/null ; result="$?"
+      "$rvm_scripts_path/gemsets" export "${snapshot_gemset}.gems" >/dev/null ; result="$?"
 
       __error_on_result "$result" "Error exporting gemset contents for $snapshot_gemset" && return "$result"
 
@@ -75,25 +82,26 @@ snapshot_save()
     done
   )
 
-  "$rvm_path/scripts/log" "info" "Backing up all of your installed rubies"
+  rvm_log "Backing up all of your installed rubies"
 
   echo '#!/usr/bin/env bash -e' > "$snapshot_temp_path/install-rubies.sh"
 
-  echo "source \"\$rvm_path/scripts/rvm\" || true" >> "$snapshot_temp_path/install-rubies.sh"
+  echo "source \"\$rvm_scripts_path/rvm\" || true" >> "$snapshot_temp_path/install-rubies.sh"
 
-  local snapshot_ruby_name_file="${rvm_tmp_path:-"$rvm_path/tmp"}/$$-rubies"
+  local snapshot_ruby_name_file="${rvm_tmp_path}/$$-rubies"
 
-  local snapshot_alias_name_file="${rvm_tmp_path:-"$rvm_path/tmp"}/$$-aliases"
+  local snapshot_alias_name_file="${rvm_tmp_path}/$$-aliases"
 
-  local snapshot_installable_file="${rvm_tmp_path:-"$rvm_path/tmp"}/$$-installable"
+  local snapshot_installable_file="${rvm_tmp_path}/$$-installable"
 
-  "$rvm_path/scripts/alias" list | awk -F ' => ' '{print $1}' | sort | uniq 2>/dev/null > "$snapshot_alias_name_file"
+  "$rvm_scripts_path/alias" list | awk -F ' => ' '{print $1}' | sort | uniq 2>/dev/null > "$snapshot_alias_name_file"
 
-  "$rvm_path/scripts/list" strings | \tr ' ' '\n' | sort | uniq > "$snapshot_ruby_name_file"
+  "$rvm_scripts_path/list" strings | \tr ' ' '\n' | sort | uniq > "$snapshot_ruby_name_file"
 
   comm -2 -3 "$snapshot_ruby_name_file" "$snapshot_alias_name_file" > "$snapshot_installable_file"
 
-  rm -rf "$snapshot_ruby_name_file" "$snapshot_alias_name_file"
+  __rvm_rm_rf "$snapshot_ruby_name_file"
+  __rvm_rm_rf "$snapshot_alias_name_file"
 
   local snapshot_primary_ruby="$(\grep '^\(ree\|ruby-1.8.7\)' < "$snapshot_installable_file" | \grep -v '-head$' | sort -r | head -n1)"
 
@@ -119,24 +127,24 @@ snapshot_save()
 
   done; unset snapshot_ruby_name snapshot_primary_ruby
 
-  rm -rf "$snapshot_installable_file"
+  __rvm_rm_rf "$snapshot_installable_file"
 
-  "$rvm_path/scripts/log" "info" "Compressing snapshotting"
+  rvm_log "Compressing snapshotting"
 
   local destination_path="$PWD"
   (
     builtin cd "$snapshot_temp_path"
-    rm -rf "$destination_path/$1.tar.gz"
+    __rvm_rm_rf "$destination_path/$1.tar.gz"
     tar czf "$destination_path/$1.tar.gz" .
     result="$?"
     __error_on_result "$result" "Error creating archive $destination_path/$1.tar.gz" && return "$result"
   )
 
-  "$rvm_path/scripts/log" "info" "Cleaning up"
+  rvm_log "Cleaning up"
 
-  rm -rf "$snapshot_temp_path"
+  __rvm_rm_rf "$snapshot_temp_path"
 
-  "$rvm_path/scripts/log" "info" "Snapshot complete"
+  rvm_log "Snapshot complete"
 }
 
 snapshot_load()
@@ -156,12 +164,12 @@ snapshot_load()
     return 1
   fi
 
-  local snapshot_temp_path="${rvm_tmp_path:-"$rvm_path/tmp"}/$$-snapshot"
+  local snapshot_temp_path="${rvm_tmp_path}/$$-snapshot"
 
-  \rm -rf "$snapshot_temp_path"
+  __rvm_rm_rf "$snapshot_temp_path"
   \mkdir -p "$snapshot_temp_path"
 
-  "$rvm_path/scripts/log" "info" "Extracting snapshot"
+  rvm_log "Extracting snapshot"
   (
     builtin cd "$snapshot_temp_path"
     tar xzf "$snapshot_archive"
@@ -169,17 +177,17 @@ snapshot_load()
     __error_on_result "$result" "Error extracting the archive '$snapshot_archive'" && return "$result"
   )
 
-  "$rvm_path/scripts/log" "info" "Restoring user settings"
-  \cp -f "$snapshot_temp_path/user" "$rvm_path/config/user"
+  rvm_log "Restoring user settings"
+  \cp -f "$snapshot_temp_path/user" "$rvm_config_path/user"
 
-  "$rvm_path/scripts/log" "info" "Installing rvm-managed packages"
+  rvm_log "Installing rvm-managed packages"
   for snapshot_package in $(cat "$snapshot_temp_path/packages"); do
-    "$rvm_path/scripts/package" install "$snapshot_package"
+    "$rvm_scripts_path/package" install "$snapshot_package"
     result="$?"
     __error_on_result "$result" "Error installing package '$snapshot_package'" && return "$result"
   done; unset snapshot_package
 
-  "$rvm_path/scripts/log" "info" "Installing rubies"
+  rvm_log "Installing rubies"
 
   chmod +x "$snapshot_temp_path/install-rubies.sh"
 
@@ -190,12 +198,12 @@ snapshot_load()
 
   export rvm_create_flag=1
 
-  "$rvm_path/scripts/log" "info" "Setting up gemsets"
+  rvm_log "Setting up gemsets"
 
   (
     builtin cd "$snapshot_temp_path/gems"
 
-    gems=($(find . -mindepth 0 -maxdepth 0 -type f -iname '*.gems' | sed 's/.gems$//'))
+    gems=($(find . -mindepth 0 -maxdepth 0 -type f "${name_opt}" '*.gems' | sed 's/.gems$//'))
 
     for snapshot_gemset in "${gems[@]//.\/}" ; do
 
@@ -213,7 +221,7 @@ snapshot_load()
       __error_on_result "$result" \
         "Error copying across cache for $snapshot_gemset" && return "$result"
 
-      "$rvm_path/scripts/gemsets" import "$snapshot_gemset" >/dev/null 2>&1
+      "$rvm_scripts_path/gemsets" import "$snapshot_gemset" >/dev/null 2>&1
       result="$?"
 
       __error_on_result "$result" \
@@ -221,25 +229,25 @@ snapshot_load()
     done
   )
 
-  "$rvm_path/scripts/log" "info" "Restoring aliases"
+  rvm_log "Restoring aliases"
 
   while read -r package_info; do
     # Note: this assumes an '=' int the input...
     local alias_name="${package_info/=*}"
     local alias_ruby="${package_info/*=}"
 
-    "$rvm_path/scripts/alias" create "$alias_name" "$alias_ruby"
+    "$rvm_scripts_path/alias" create "$alias_name" "$alias_ruby"
     if [[ "$alias_name" = "default" ]]; then
-      (source "$rvm_path/scripts/rvm" && rvm use "$alias_ruby" --default) >/dev/null 2>&1
+      (source "$rvm_scripts_path/rvm" && rvm use "$alias_ruby" --default) >/dev/null 2>&1
       result="$?"
       __error_on_result "$result" "Error setting default to $alias_ruby" && return "$result"
     fi
   done < "$snapshot_temp_path/alias"
 
-  "$rvm_path/scripts/log" "info" "Cleaning up load process"
-  \rm -rf "$snapshot_temp_path"
+  rvm_log "Cleaning up load process"
+  __rvm_rm_rf "$snapshot_temp_path"
 
-  "$rvm_path/scripts/log" "info" "Loaded snapshot from $(basename "$snapshot_archive")"
+  rvm_log "Loaded snapshot from $(basename "$snapshot_archive")"
 }
 
 snapshot_usage()

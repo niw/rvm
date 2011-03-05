@@ -4,15 +4,14 @@
 # To disable this fature, set export rvm_project_rvmrc=0 in $HOME/.rvmrc
 if [[ ${rvm_project_rvmrc:-1} -ne 0 ]] ; then
 
-  if [[ -n "${ZSH_VERSION:-""}" ]] ; then
+  __rvm_after_cd()
+  {
+    rvm_hook="after_cd"
+    source "${rvm_scripts_path:-"$rvm_path/scripts"}/hook"
+    #__rvm_unset_exports
+  }
 
-    __rvm_after_cd() {
-
-      rvm_hook="after_cd"
-
-      source "$rvm_path/scripts/hook"
-
-    }
+  if [[ -n "${ZSH_VERSION:-}" ]] ; then
 
     autoload is-at-least
 
@@ -26,11 +25,9 @@ if [[ ${rvm_project_rvmrc:-1} -ne 0 ]] ; then
       cd()
       {
         builtin cd "$@"
-
         local result=$?
 
         __rvm_project_rvmrc
-
         __rvm_after_cd
 
         return $result
@@ -43,12 +40,10 @@ if [[ ${rvm_project_rvmrc:-1} -ne 0 ]] ; then
     cd()
     {
       builtin cd "$@"
-
       local result=$?
 
       __rvm_project_rvmrc
-
-      rvm_hook="after_cd" ; source "$rvm_path/scripts/hook"
+      __rvm_after_cd
 
       return $result
     }

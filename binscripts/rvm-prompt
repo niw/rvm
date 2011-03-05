@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-add(){
+add()
+{
 
   token=${1:-""}
 
@@ -8,13 +9,34 @@ add(){
 
   if [[ -n "$format" ]] ; then
 
-    format="${format}-\$${token}"
+    if [[ ${previous_is_format_var:-0} = 1 ]] ; then
+
+      format="${format}-\$${token}"
+
+    else
+
+      format="${format}\$${token}"
+
+    fi
 
   else
 
     format="\$${token}"
 
   fi
+
+  previous_is_format_var=1
+
+  return 0
+}
+
+add_raw_token()
+{
+  previous_is_format_var=0
+
+  token=${1:-""}
+
+  format="${format:-""}${token}"
 
   return 0
 }
@@ -51,22 +73,19 @@ if [[ -n "$ruby" && -n "$(echo "$ruby" | awk '/rvm/{print}')" ]] ; then
 
       -d|--no-default) no_default=1      ;;
 
-      *) echo "Unrecognized command line option '$token' for $0" ; exit 1 ;;
+      *) add_raw_token "$token" ;;
 
     esac
 
   done
 
+  if [[ -z "${format:-""}" ]] ; then
 
-  if [[ -z "$format" ]] ; then
+    for default in interpreter version patchlevel gemset ; do
 
-    add "interpreter"
+      add "$default"
 
-    add "version"
-
-    add "patchlevel"
-
-    add "gemset"
+    done
 
   fi
 

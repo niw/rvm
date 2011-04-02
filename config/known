@@ -21,9 +21,7 @@ goruby
 jruby-1.2.0
 jruby-1.3.1
 jruby-1.4.0
-jruby[-1.5.6]
-jruby-1.6.0.RC1
-jruby-1.6.0.RC2
+jruby[-1.6.0]
 jruby-head
 
 # Rubinius
@@ -33,6 +31,7 @@ rbx-1.1.1
 rbx-1.2.0
 rbx-1.2.1
 rbx-1.2.2
+rbx-1.2.3
 rbx[-head]
 
 # Ruby Enterprise Edition
@@ -41,12 +40,15 @@ ree[-1.8.7][-2011.03]
 ree-1.8.6-head
 ree-1.8.7-head
 
+# Kiji
+kiji
+
 # MagLev
-maglev[-25375]
+maglev[-25506]
 maglev-head
 
 # Mac OS X Snow Leopard Only
-macruby[-0.9] # the default macruby
+macruby[-0.10] # the default macruby
 macruby-nightly
 macruby-head      # Build from the macruby git repository
 

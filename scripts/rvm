@@ -5,52 +5,39 @@
 # http://github.com/wayneeseguin/rvm
 
 # Is RVM loaded as a shell function already?
-if ! declare -f rvm > /dev/null || [[ ${rvm_reload_flag:-0} -eq 1 ]] ; then
 
-  if [[ ${rvm_ignore_rvmrc:-0} -eq 0 ]]; then
+export HOME="${HOME%%+(\/)}" # Remove trailing slashes if they exist on HOME
 
-    for rvmrc in /etc/rvmrc "$HOME/.rvmrc" ; do
-
-      if [[ -f "$rvmrc" ]] ; then
-
-        if \grep -q '^\s*rvm .*$' $rvmrc ; then
-
-          printf "\nError: $rvmrc is for rvm settings only.\nrvm CLI may NOT be called from within $rvmrc. \nSkipping the loading of $rvmrc"
-
-          return 1
-
-        else
-
-          source "$rvmrc"
-
-        fi
-
+if [[ ${rvm_ignore_rvmrc:-0} -eq 0 ]]; then
+  for rvmrc in /etc/rvmrc "$HOME/.rvmrc" ; do
+    if [[ -f "$rvmrc" ]] ; then
+      if \grep -q '^\s*rvm .*$' $rvmrc ; then
+        printf "\nError: $rvmrc is for rvm settings only.\nrvm CLI may NOT be called from within $rvmrc. \nSkipping the loading of $rvmrc"
+        return 1
+      else
+        source "$rvmrc"
       fi
+    fi
+  done
+fi
 
-    done
-
-  fi
+if [[ -z "${rvm_path:-}" ]] ; then
 
   # Set the default sandboxed value.
   # TODO: Alter the variable names to make sense
-  if [[ -z "${rvm_selfcontained:-""}" ]]; then
+  if [[ -z "${rvm_user_install:-""}" ]]; then
 
-    if [[ $(id | \sed -e 's/(.*//' | awk -F= '{print $2}') -eq 0 || \
-      -n "$rvm_prefix" && "$rvm_prefix" != "$HOME"/* ]]; then
-
-      rvm_selfcontained=0
-
+    if [[ $UID -eq 0 || -n "$rvm_prefix" && "$rvm_prefix" != "$HOME"/* ]]; then
+      rvm_user_install=0
     else
-
-      rvm_selfcontained=1
-
+      rvm_user_install=1
     fi
 
   fi
 
   if [[ -z "${rvm_prefix:-""}" ]] ; then
 
-    if [[ "${rvm_selfcontained:-0}" = "0" ]] ; then
+    if [[ "${rvm_user_install:-0}" = "0" ]] ; then
 
       rvm_prefix="/usr/local/"
 
@@ -68,36 +55,38 @@ if ! declare -f rvm > /dev/null || [[ ${rvm_reload_flag:-0} -eq 1 ]] ; then
 
   fi
 
-  if [[ ${rvm_load_rvm:-1} -eq 1 ]] ; then
+  # Fix rvm_prefix changes.
+  [[ "${rvm_prefix}" != *[/.] && -d "${rvm_prefix/rvm/scripts}" ]]
 
-    # Fix rvm_prefix changes.
-    [[ "${rvm_prefix}" != *[/.] && -d "${rvm_prefix/rvm/scripts}" ]]
+  rvm_prefix_needs_trailing_slash="$?"
 
-    rvm_prefix_needs_trailing_slash="$?"
+  if [[ "$rvm_prefix" = "/usr/local" || "$rvm_prefix_needs_trailing_slash" = "0" ]]; then
 
-    if [[ "$rvm_prefix" = "/usr/local" || "$rvm_prefix_needs_trailing_slash" = "0" ]]; then
+    rvm_prefix="$rvm_prefix/"
 
-      rvm_prefix="$rvm_prefix/"
+  fi
 
-    fi
+  if [[ -z "${rvm_path:-""}" ]] ; then
+    rvm_path="${rvm_prefix}rvm"
+  fi
 
-    if [[ -z "${rvm_path:-""}" ]] ; then
-      rvm_path="${rvm_prefix}rvm"
-    fi
+  export rvm_path="${rvm_path%%+(\/)}"
 
-    if [[ -d "$rvm_path" ]] ; then
+fi
 
-      true ${rvm_scripts_path:="$rvm_path/scripts"}
+if ! declare -f rvm > /dev/null || [[ ${rvm_reload_flag:-0} -eq 1 ]] ; then
+
+  if [[ -d "$rvm_path" ]] ; then
+
+    true ${rvm_scripts_path:="$rvm_path/scripts"}
+
+    if [[ ${rvm_load_rvm:-1} -eq 1 ]] ; then
+
       for script in base version selector cd cli override_gem ; do
-
         if [[ -f "$rvm_scripts_path/$script" ]] ; then
-
           source "$rvm_scripts_path/$script"
-
         else
-
-          rvm_error "WARNING: Could not source script '$rvm_scripts_path/$script', file does not exist. RVM will likely not work as expected."
-
+          printf "WARNING: Could not source script '$rvm_scripts_path/$script', file does not exist. RVM will likely not work as expected.\n"
         fi
       done
 
@@ -109,11 +98,8 @@ if ! declare -f rvm > /dev/null || [[ ${rvm_reload_flag:-0} -eq 1 ]] ; then
 
       if ! command -v ruby >/dev/null 2>&1 || command -v ruby | \grep -v rvm >/dev/null ; then
 
-        if [[ -s "$rvm_environments_path/default" ]] ; then
-
+        [[ -s "$rvm_environments_path/default" ]] &&
           source "$rvm_environments_path/default"
-
-        fi
 
       fi
 
@@ -123,16 +109,18 @@ if ! declare -f rvm > /dev/null || [[ ${rvm_reload_flag:-0} -eq 1 ]] ; then
     else
       printf "\n\$rvm_path ($rvm_path) does not exist."
     fi
-
   fi
-
   unset rvm_prefix_needs_trailing_slash rvm_rc_files rvm_gems_cache_path rvm_gems_path rvm_project_rvmrc_default rvm_gemset_separator
 
 fi
 
-if [[ "screen" = $TERM || ${rvm_interactive_flag:-0} -gt 0 ]]; then
-  # Reload the rvmrc, use promptless ensuring shell processes does not prompt
-  # if .rvmrc trust value is not stored.
-  rvm_promptless=1 __rvm_project_rvmrc
-fi
+case $- in
+  *i*)
+    if [[ "screen" = $TERM ]]; then
+      # Reload the rvmrc, use promptless ensuring shell processes does not
+      # prompt if .rvmrc trust value is not stored.
+      rvm_promptless=1 __rvm_project_rvmrc
+    fi
+    ;;
+esac
 
